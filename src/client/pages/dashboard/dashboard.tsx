@@ -7,26 +7,6 @@ type BananaGridOptions = {
     gap?: number;        // center-to-center spacing along diamond's left-right axis (full diamond width)
 };
 
-interface ProcessedImage {
-    id: number;
-    sourceFile?: File;
-    sourceText?: string;
-    processedImage: HTMLImageElement | null;
-    originalImageUrl?: string;
-    showOriginal?: boolean;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    isGenerating: boolean;
-    contentBounds: { x: number; y: number; width: number; height: number; };
-    sourcePreviewUrl?: string;
-    flippedHorizontally?: boolean;
-    isVariation?: boolean;
-    remixSuggestions?: string[];
-    generatingPrompt?: string; // To display during loading
-}
-
 const drawBananaGrid = (
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -139,11 +119,6 @@ const drawBananaGrid = (
 };
 
 export const DashboardPage = () => {
-    const [imageData, setImageData] = useState(null);
-    const [prompt1, setPrompt1Data] = useState("");
-    const [prompt2, setPrompt2Data] = useState("");
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [error, setError] = useState(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -252,60 +227,55 @@ export const DashboardPage = () => {
         }
     };
 
-    const handleGenerateTextToImage = async (prompt: string) => {
-        try {
-            setIsGenerating(true);
-            setError(null);
+    // const handleGenerateTextToImage = async (prompt: string) => {
+    //     try {
+    //         setIsGenerating(true);
+    //         setError(null);
 
-            const result = await generateTextToImage({
-                prompt: prompt, options: {
-                    image_size: "square_hd",
-                    num_images: 1
-                }
-            });
+    //         const result = await generateTextToImage({
+    //             prompt: prompt, options: {
+    //                 image_size: "square_hd",
+    //                 num_images: 1
+    //             }
+    //         });
 
-            // @ts-ignore
-            setImageData(result);
-            console.log('Generated image:', result);
-        } catch (err) {
-            console.error('Error generating image:', err);
-            // @ts-ignore
-            setError(err.message);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
+    //         // @ts-ignore
+    //         setImageData(result);
+    //         console.log('Generated image:', result);
+    //     } catch (err) {
+    //         console.error('Error generating image:', err);
+    //         // @ts-ignore
+    //         setError(err.message);
+    //     } finally {
+    //         setIsGenerating(false);
+    //     }
+    // };
 
-    const handleGenerateImageToImage = async (prompt: string) => {
-        try {
-            setIsGenerating(true);
-            setError(null);
+    // const handleGenerateImageToImage = async (prompt: string) => {
+    //     try {
+    //         setIsGenerating(true);
+    //         setError(null);
 
-            const result = await generateImageToImage({
-                prompt: prompt,
-                image_urls: ["https://v3.fal.media/files/panda/x26pjHNLYN-VX-pLUzhzK.jpeg"],
-                options: {
-                    image_size: "square_hd",
-                    num_images: 1
-                }
-            });
+    //         const result = await generateImageToImage({
+    //             prompt: prompt,
+    //             image_urls: ["https://v3.fal.media/files/panda/x26pjHNLYN-VX-pLUzhzK.jpeg"],
+    //             options: {
+    //                 image_size: "square_hd",
+    //                 num_images: 1
+    //             }
+    //         });
 
-            // @ts-ignore
-            setImageData(result);
-            console.log('Generated image:', result);
-        } catch (err) {
-            console.error('Error generating image:', err);
-            // @ts-ignore
-            setError(err.message);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    const textareastyle = {
-        width: "700px",
-        height: "100px"
-    }
+    //         // @ts-ignore
+    //         setImageData(result);
+    //         console.log('Generated image:', result);
+    //     } catch (err) {
+    //         console.error('Error generating image:', err);
+    //         // @ts-ignore
+    //         setError(err.message);
+    //     } finally {
+    //         setIsGenerating(false);
+    //     }
+    // };
 
     return (
         <div
@@ -326,70 +296,3 @@ export const DashboardPage = () => {
         </div>
     );
 };
-
-
-
-{/* <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-                <label style={{ fontSize: 12 }}>
-                    Banana Size: {bananaSize}px
-                    <input
-                        type="range"
-                        min={10}
-                        max={200}
-                        value={bananaSize}
-                        onChange={e => setBananaSize(Number(e.target.value))}
-                        style={{ width: 200, display: 'block' }}
-                    />
-                </label>
-                <label style={{ fontSize: 12 }}>
-                    Gap: {gap}px
-                    <input
-                        type="range"
-                        min={40}
-                        max={300}
-                        value={gap}
-                        onChange={e => setGap(Number(e.target.value))}
-                        style={{ width: 200, display: 'block' }}
-                    />
-                </label>
-            </div> */}
-{/* <br />
-            <br />
-            <>
-                <textarea style={textareastyle} value={prompt1} onChange={(event) => {
-                    setPrompt1Data(event.target.value);
-                }} />
-                <br />
-                <button
-                    onClick={() => handleGenerateTextToImage(prompt1)}
-                    disabled={isGenerating}
-                >
-                    {isGenerating ? 'Generating...' : 'Generate Text to Image'}
-                </button>
-                <br /><br />
-
-                <textarea style={textareastyle} value={prompt2} onChange={(event) => {
-                    setPrompt2Data(event.target.value);
-                }} />
-                <br />
-                <button
-                    onClick={() => handleGenerateImageToImage(prompt2)}
-                    disabled={isGenerating}
-                >
-                    {isGenerating ? 'Generating...' : 'Generate Image to Image'}
-                </button>
-                <br /><br />
-
-                <button onClick={logout}>Logout</button>
-
-                {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-
-                {imageData ? (
-                    <div>
-                        <h3>Generated Image:</h3>
-                        {imageData?.data?.images && imageData?.data?.images.map((img, index) => (
-                            <img key={index} src={img.url} alt="Generated" style={{ maxWidth: '500px' }} />
-                        ))}
-                    </div>
-                ) : null}
-            </> */}
