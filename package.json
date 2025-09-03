@@ -3,6 +3,7 @@
   "type": "module",
   "dependencies": {
     "@fal-ai/client": "^1.6.2",
+    "@google-cloud/storage": "^1.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.57.0",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
+    "@types/google-cloud__storage": "^1.7.2",
     "@types/react": "^18.0.37",
     "eslint": "^9.27.0",
     "eslint-config-prettier": "^10.1.5",

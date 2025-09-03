@@ -1,4 +1,5 @@
 import { fal } from "@fal-ai/client";
+import { getFilesFromBucket } from "./gcs.js";
 
 fal.config({
     credentials: process?.env?.FAL_KEY,
@@ -58,6 +59,21 @@ export const generateImageToImage = async ({ prompt, options, image_urls }: Gene
         return result;
     } catch (error) {
         console.error("Error generating image:", error);
+        throw error;
+    }
+};
+
+export const getBucketList = async () => {
+    try {
+        const files = await getFilesFromBucket();
+        return files.map(file => ({
+            name: file.name,
+            size: file.metadata?.size || 0,
+            timeCreated: file.metadata?.timeCreated || null,
+            contentType: file.metadata?.contentType || null
+        }));
+    } catch (error) {
+        console.error("Error getting bucket list:", error);
         throw error;
     }
 };

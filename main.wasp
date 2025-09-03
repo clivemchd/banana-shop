@@ -39,6 +39,20 @@ query generateImageToImage {
 	fn: import { generateImageToImage } from "@src/server/test"
 }
 
+query getBucketList {
+	fn: import { getBucketList } from "@src/server/test"
+}
+
+action createResumableUpload {
+	fn: import { createResumableUpload } from "@src/server/upload-actions",
+	entities: [Users]
+}
+
+action getUploadStatus {
+	fn: import { getUploadStatus } from "@src/server/upload-actions",
+	entities: [Users]
+}
+
 // query getTasks {
 // 	fn: import { getTasks } from "@src/tasks-server",
 // 	entities: [Image]
