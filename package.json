@@ -17,7 +17,9 @@
     "deploy": "bash ./bash/deploy.sh",
     "db:start": "bash ./bash/db-start.sh",
     "dev:dbm": "bash ./bash/db-migrate-dev.sh",
-    "db:preview": "wasp db studio"
+    "db:preview": "wasp db studio",
+    "gcs:cors": "gcloud storage buckets update gs://banana-shop-bucket-dev --cors-file=cors.json",
+    "gcs:cors:check": "gcloud storage buckets describe gs://banana-shop-bucket-dev --format=\"json(cors)\""
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
