@@ -31,6 +31,12 @@ page DashboardPage {
 	component: import { DashboardPage } from "@src/client/pages/dashboard/dashboard"
 }
 
+route FileUploadPageRoute { path: "/fileupload", to: FileUploadPage }
+page FileUploadPage {
+	authRequired: true,
+	component: import { FileUploadPage } from "@src/client/pages/file-upload/file-upload"
+}
+
 query generateTextToImage {
 	fn: import { generateTextToImage } from "@src/server/test"
 }
@@ -51,6 +57,10 @@ action createResumableUpload {
 action getUploadStatus {
 	fn: import { getUploadStatus } from "@src/server/upload-actions",
 	entities: [Users]
+}
+
+action uploadFileTestBucket {
+	fn: import { uploadFileTestBucket } from "@src/server/file-upload/file-upload"
 }
 
 // query getTasks {
