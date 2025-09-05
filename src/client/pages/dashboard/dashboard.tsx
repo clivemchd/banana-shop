@@ -17,7 +17,7 @@ export const DashboardPage = () => {
                             Image Analysis
                         </h2>
                         <p className="text-gray-600 mb-4">
-                            Upload an image and select areas to get AI-powered analysis using fal.ai's Moondream2 vision model.
+                            Upload an image and select areas to get AI-powered analysis using LM Studio's MiniCPM-o-2_6 vision model running locally.
                         </p>
                         <Link
                             to="/analyzer"
