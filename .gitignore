@@ -9,3 +9,7 @@ node_modules/
 # Don't ignore example dotenv files.
 !.env.example
 !.env.*.example
+
+# Google Cloud Service Account credentials
+banana-shop-470810-a4d04f8e0b63.json
+_banana-shop-470810-a4d04f8e0b63.json

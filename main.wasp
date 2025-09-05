@@ -31,12 +31,28 @@ page DashboardPage {
 	component: import { DashboardPage } from "@src/client/pages/dashboard/dashboard"
 }
 
+route ImageAnalyzerPageRoute { path: "/analyzer", to: ImageAnalyzerPage }
+page ImageAnalyzerPage {
+	authRequired: true,
+	component: import { ImageAnalyzerPage } from "@src/client/pages/imageAnalyzer/ImageAnalyzerPage"
+}
+
 query generateTextToImage {
 	fn: import { generateTextToImage } from "@src/server/test"
 }
 
 query generateImageToImage {
 	fn: import { generateImageToImage } from "@src/server/test"
+}
+
+action analyzeImageArea {
+	fn: import { analyzeImageArea } from "@src/server/imageAnalysis",
+	entities: [Image]
+}
+
+action uploadImage {
+	fn: import { uploadImage } from "@src/server/imageAnalysis",
+	entities: [Image]
 }
 
 // query getTasks {

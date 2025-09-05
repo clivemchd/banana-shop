@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>Image Editor with Gemini 2.5 Nano Banana + Three.js</title>
+  <link rel="stylesheet" href="./style.css">
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Three.js postprocessing (r128, non-module scripts using global THREE) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/Pass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  
+
+  <div id="container"></div>
+
+  <div class="ui-container">
+    <div class="flex justify-center">
+      <div id="controls" class="glass-panel ui-element w-full max-w-4xl">
+        <div class="flex flex-col md:flex-row w-full items-center gap-3">
+          <div class="file-input-wrapper w-full md:w-auto flex-shrink-0">
+            <input type="file" id="imageUpload" accept="image/*" class="ui-element">
+            <label for="imageUpload" class="file-input-label w-full text-center md:w-auto" id="fileLabel">Upload Image</label>
+          </div>
+
+          <div class="flex items-center w-full flex-1 min-w-0 gap-3">
+            <div id="micBtn" class="ui-element" title="Voice prompt">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M5 3a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0V3z"/>
+                <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5z"/>
+              </svg>
+            </div>
+            <input type="text" id="prompt" placeholder="Describe your edit..." class="ui-element flex-grow bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" disabled>
+          </div>
+
+          <div class="flex items-center w-full md:w-auto flex-shrink-0 gap-3">
+            <button id="submitBtn" class="btn ui-element w-full md:w-auto" disabled>Edit Image</button>
+            <button id="downloadBtn" class="btn ui-element w-full md:w-auto" disabled>Download</button>
+          </div>
+        </div>
+        <div class="flex items-center justify-between mt-3 gap-3">
+          <div class="flex items-center gap-2">
+            <label for="apiKeyInput" class="text-sm text-gray-300 whitespace-nowrap">API Key:</label>
+            <input type="password" id="apiKeyInput" placeholder="Enter Gemini API key" class="ui-element bg-gray-700 border border-gray-600 rounded-md px-2 py-1 h-8 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <button id="apiKeyClearBtn" class="ui-element text-xs bg-gray-600 hover:bg-gray-500 text-white rounded px-2 py-1 h-7 hidden" title="Remove stored API key">Remove</button>
+          </div>
+          <div id="messageBox" class="text-right text-gray-400 h-5 flex-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { GoogleGenAI } from 'https://cdn.jsdelivr.net/npm/@google/genai@latest/+esm';
+
+    // --- State ---
+    let scene, camera, renderer, frameMesh, shaderMat;
+    let bloomComposer, finalComposer, renderPass, bloomPass, finalPass;
+    let container = document.getElementById('container');
+    let isEditing = false;
+    let currentDataUrl = null; // holds the displayed image (data URL)
+    const imageFrameHeight = 7;
+    const BLOOM_STRENGTH = 1.5;   // Strong bloom for magical effect
+    const BLOOM_RADIUS = 0.8;
+    const BLOOM_THRESHOLD = 0.2; // Lower threshold for more glow
+    const BLOOM_LAYER = 1;
+
+    // Mouse tilt and zoom
+    const mouse = new THREE.Vector2(0, 0);
+    const targetRot = new THREE.Vector2(0, 0);
+    const currentRot = new THREE.Vector2(0, 0);
+    const MAX_TILT = 0.18; // ~10 degrees in radians
+    const ROTATION_LERP = 0.08;
+    const ZOOM_SPEED = 0.01;
+    const MIN_ZOOM = 5.0;  // Can get closer to image
+    const MAX_ZOOM = 50.0; // Don't need to zoom so far out now
+
+    // UI
+    const imageUpload = document.getElementById('imageUpload');
+    const fileLabel   = document.getElementById('fileLabel');
+    const promptInput = document.getElementById('prompt');
+    const submitBtn   = document.getElementById('submitBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const messageBox  = document.getElementById('messageBox');
+    const micBtn      = document.getElementById('micBtn');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const apiKeyClearBtn = document.getElementById('apiKeyClearBtn');
+    // Dev UI refs
+    const devToggle = document.getElementById('devToggle');
+    const devPanel = document.getElementById('devPanel');
+    const devClose = document.getElementById('devClose');
+    const ctlBloomStrength = document.getElementById('ctlBloomStrength');
+    const ctlBloomRadius = document.getElementById('ctlBloomRadius');
+    const ctlBloomThresh = document.getElementById('ctlBloomThresh');
+    const lblBloomStrength = document.getElementById('lblBloomStrength');
+    const lblBloomRadius = document.getElementById('lblBloomRadius');
+    const lblBloomThresh = document.getElementById('lblBloomThresh');
+    const ctlEdge = document.getElementById('ctlEdge');
+    const lblEdge = document.getElementById('lblEdge');
+    const ctlNoiseScale = document.getElementById('ctlNoiseScale');
+    const lblNoiseScale = document.getElementById('lblNoiseScale');
+    const ctlPSize = document.getElementById('ctlPSize');
+    const lblPSize = document.getElementById('lblPSize');
+    const ctlNoiseType = document.getElementById('ctlNoiseType');
+    const ctlDissolveMs = document.getElementById('ctlDissolveMs');
+    const ctlResolveMs = document.getElementById('ctlResolveMs');
+    const ctlEmitD = document.getElementById('ctlEmitD');
+    const ctlEmitR = document.getElementById('ctlEmitR');
+    const btnRebuildNoise = document.getElementById('btnRebuildNoise');
+
+    // --- Helpers ---
+    const showMessage = (msg, isError=false) => {
+      messageBox.textContent = msg || '';
+      messageBox.style.color = isError ? '#fca5a5' : '#9ca3af';
+    };
+    const setBusy = (busy) => {
+      isEditing = busy;
+      submitBtn.disabled = busy || !promptInput.value || !currentDataUrl;
+      imageUpload.disabled = busy;
+      promptInput.disabled = busy || !currentDataUrl;
+      micBtn.style.opacity = busy ? 0.5 : 1;
+    };
+    const checkForm = () => {
+      const hasKey = !!(apiKeyInput && apiKeyInput.value && apiKeyInput.value.trim().length);
+      submitBtn.disabled = !promptInput.value || !currentDataUrl || isEditing || !hasKey;
+      downloadBtn.disabled = !currentDataUrl;
+    };
+    const dataUrlToParts = (dataUrl) => {
+      const [meta, b64] = dataUrl.split(',');
+      const mimeType = meta.substring(meta.indexOf(':')+1, meta.indexOf(';')) || 'image/png';
+      return { mimeType, base64: b64 };
+    };
+
+    // --- Three.js setup ---
+    function initThree() {
+      scene = new THREE.Scene();
+      
+      // Create outer space environment
+      createOuterSpace();
+      
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+      camera.position.z = 10; // Closer to image
+
+      renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false }); // No alpha for skybox
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+
+      const geo = new THREE.PlaneGeometry(1, 1, 1, 1);
+      shaderMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTexture: { value: null },
+          uProgress: { value: 0.0 },
+          uTime: { value: 0.0 },
+          uEdge: { value: 0.06 }, // Thinner edge for cleaner look
+          uNoiseScale: { value: 3.0 },
+          uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+          uNoiseTex: { value: null },
+        },
+        transparent: true,
+        side: THREE.DoubleSide,
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision highp float;
+          varying vec2 vUv;
+          uniform sampler2D uTexture;
+          uniform float uProgress;
+          uniform float uEdge;
+          uniform float uTime;
+          uniform float uNoiseScale;
+          uniform sampler2D uNoiseTex;
+
+          // 3D Perlin noise function
+          vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+          vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+          vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
+          vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+          
+          float snoise(vec3 v) {
+            const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+            const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+            vec3 i = floor(v + dot(v, C.yyy));
+            vec3 x0 = v - i + dot(i, C.xxx);
+            vec3 g = step(x0.yzx, x0.xyz);
+            vec3 l = 1.0 - g;
+            vec3 i1 = min(g.xyz, l.zxy);
+            vec3 i2 = max(g.xyz, l.zxy);
+            vec3 x1 = x0 - i1 + C.xxx;
+            vec3 x2 = x0 - i2 + C.yyy;
+            vec3 x3 = x0 - D.yyy;
+            i = mod289(i);
+            vec4 p = permute(permute(permute(
+              i.z + vec4(0.0, i1.z, i2.z, 1.0))
+              + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+              + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+            float n_ = 0.142857142857;
+            vec3 ns = n_ * D.wyz - D.xzx;
+            vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+            vec4 x_ = floor(j * ns.z);
+            vec4 y_ = floor(j - 7.0 * x_);
+            vec4 x = x_ * ns.x + ns.yyyy;
+            vec4 y = y_ * ns.x + ns.yyyy;
+            vec4 h = 1.0 - abs(x) - abs(y);
+            vec4 b0 = vec4(x.xy, y.xy);
+            vec4 b1 = vec4(x.zw, y.zw);
+            vec4 s0 = floor(b0) * 2.0 + 1.0;
+            vec4 s1 = floor(b1) * 2.0 + 1.0;
+            vec4 sh = -step(h, vec4(0.0));
+            vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+            vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+            vec3 p0 = vec3(a0.xy, h.x);
+            vec3 p1 = vec3(a0.zw, h.y);
+            vec3 p2 = vec3(a1.xy, h.z);
+            vec3 p3 = vec3(a1.zw, h.w);
+            vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+            p0 *= norm.x;
+            p1 *= norm.y;
+            p2 *= norm.z;
+            p3 *= norm.w;
+            vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+            m = m * m;
+            return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+          }
+
+          void main() {
+            vec4 tex = texture2D(uTexture, vUv);
+            
+            // If fully visible (no dissolve), just show the image
+            if (uProgress <= 0.001) {
+              gl_FragColor = tex;
+              return;
+            }
+            
+            // If fully dissolved, discard everything
+            if (uProgress >= 0.999) {
+              discard;
+              return;
+            }
+            
+            // Codrops-style dissolve with 3D noise
+            vec3 noiseCoord = vec3(vUv * uNoiseScale, uTime * 0.15);
+            float noiseValue = snoise(noiseCoord) * 0.5 + 0.5; // Normalize to 0-1
+            
+            // Add texture-based noise for more variation
+            float texNoise = texture2D(uNoiseTex, vUv * uNoiseScale * 0.5 + vec2(uTime * 0.05)).r;
+            noiseValue = mix(noiseValue, texNoise, 0.3);
+            
+            // Progress-based dissolution
+            float dissolveThreshold = uProgress;
+            float edgeStart = dissolveThreshold - uEdge;
+            float edgeEnd = dissolveThreshold + uEdge;
+            
+            // Discard pixels below the threshold
+            if (noiseValue < edgeStart) {
+              discard;
+            }
+            
+            // Calculate edge glow
+            float edgeFactor = 0.0;
+            if (noiseValue >= edgeStart && noiseValue <= edgeEnd) {
+              edgeFactor = 1.0 - abs((noiseValue - dissolveThreshold) / uEdge);
+            }
+            
+            // Edge color with bloom-friendly brightness
+            vec3 edgeColor = vec3(0.4, 0.8, 1.0); // Cyan-blue edge
+            vec3 glowColor = vec3(1.0, 0.6, 0.9); // Pink-purple glow
+            vec3 finalEdgeColor = mix(edgeColor, glowColor, edgeFactor * 0.5);
+            
+            // Mix original color with edge effect
+            vec3 color = tex.rgb;
+            if (edgeFactor > 0.0) {
+              // Add edge highlight without oversaturating
+              color = mix(color, finalEdgeColor, edgeFactor * 0.6);
+              // Boost brightness at the very edge
+              color += finalEdgeColor * edgeFactor * edgeFactor * 0.3;
+            }
+            
+            // Alpha based on noise
+            float alpha = smoothstep(edgeStart, edgeEnd + 0.02, noiseValue) * tex.a;
+            
+            gl_FragColor = vec4(color, alpha);
+          }
+        `
+      });
+      frameMesh = new THREE.Mesh(geo, shaderMat);
+      frameMesh.layers.set(0); // Main image on layer 0 (no bloom)
+      frameMesh.renderOrder = 1; // Render after skybox
+      frameMesh.position.z = 0; // Ensure it's at origin
+      scene.add(frameMesh);
+      initParticles();
+
+      // Bloom composer for particles
+      bloomComposer = new THREE.EffectComposer(renderer);
+      bloomComposer.renderToScreen = false;
+      renderPass = new THREE.RenderPass(scene, camera);
+      bloomPass = new THREE.UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        BLOOM_STRENGTH,
+        BLOOM_RADIUS,
+        BLOOM_THRESHOLD
+      );
+      bloomComposer.addPass(renderPass);
+      bloomComposer.addPass(bloomPass);
+
+      window.addEventListener('resize', onResize);
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseleave', onPointerLeave);
+      window.addEventListener('wheel', onWheel, { passive: true });
+      onResize();
+      animate();
+    }
+
+    function onResize() {
+      if (!renderer || !camera) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      if (bloomComposer) bloomComposer.setSize(window.innerWidth, window.innerHeight);
+      if (shaderMat) shaderMat.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      // Smoothly lerp frame tilt toward target rotation
+      if (frameMesh) {
+        currentRot.x += (targetRot.x - currentRot.x) * ROTATION_LERP;
+        currentRot.y += (targetRot.y - currentRot.y) * ROTATION_LERP;
+        frameMesh.rotation.x = currentRot.x;
+        frameMesh.rotation.y = currentRot.y;
+      }
+      if (shaderMat) shaderMat.uniforms.uTime.value += 0.016;
+      // Update particles
+      updateParticles(0.016);
+      // Simplified selective bloom rendering
+      // 1) Render particles with bloom to composer
+      camera.layers.set(1);
+      if (bloomComposer) {
+        bloomComposer.render();
+      }
+      
+      // 2) Render main scene (image + particles)
+      renderer.setRenderTarget(null);
+      renderer.clear();
+      
+      // First render the image (layer 0)
+      camera.layers.set(0);
+      renderer.render(scene, camera);
+      
+      // Then render bloomed particles on top (additive)
+      if (bloomComposer && bloomComposer.readBuffer) {
+        renderer.autoClear = false;
+        camera.layers.set(1);
+        renderer.render(scene, camera);
+        renderer.autoClear = true;
+      }
+    }
+
+    // Fit plane to keep a fixed height while preserving aspect ratio
+    function fitFrameToTexture(tex) {
+      const img = tex.image;
+      if (!img || !img.width || !img.height) return;
+      const aspect = img.width / img.height;
+      const height = imageFrameHeight;
+      const width = height * aspect;
+      frameMesh.geometry.dispose();
+      frameMesh.geometry = new THREE.PlaneGeometry(width, height, 1, 1);
+    }
+
+    function setTextureFromDataUrl(dataUrl, shouldResolveIn = false) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const tex = new THREE.Texture(img);
+          tex.needsUpdate = true;
+          shaderMat.uniforms.uTexture.value = tex;
+          
+          if (shouldResolveIn) {
+            // Start fully dissolved
+            shaderMat.uniforms.uProgress.value = 1.0;
+          } else {
+            shaderMat.uniforms.uProgress.value = 0.0;
+          }
+          
+          fitFrameToTexture(tex);
+          // update color sampler for particles
+          updateColorSampler(img);
+          resolve();
+        };
+        img.src = dataUrl;
+      });
+    }
+
+    // --- Particles (GPU points with CPU simulation) ---
+    const MAX_PARTICLES = 5000; // Less particles for cleaner effect
+    let particles, pGeom, pMat;
+    let pInitPositions, pCurrentPositions, pColors, pAlphas, pVelocities, pMaxOffset, pDistance;
+    let particleEmittingUntil = 0;
+    let particleSpeedFactor = 0.025; // Faster movement
+    let particleWaveAmplitude = 0.8; // More dramatic waves
+    let colorCanvas = document.createElement('canvas');
+    let colorCtx = colorCanvas.getContext('2d', { willReadFrequently: true });
+    // Shared noise texture (matches shader) for perfect edge alignment
+    let noiseCanvas = document.createElement('canvas');
+    let noiseCtx = noiseCanvas.getContext('2d', { willReadFrequently: true });
+    let noiseTex = null;
+
+    function updateColorSampler(img) {
+      colorCanvas.width = img.width;
+      colorCanvas.height = img.height;
+      colorCtx.drawImage(img, 0, 0, img.width, img.height);
+    }
+
+    function initParticles() {
+      pGeom = new THREE.BufferGeometry();
+      pInitPositions = new Float32Array(MAX_PARTICLES * 3);
+      pCurrentPositions = new Float32Array(MAX_PARTICLES * 3);
+      pColors = new Float32Array(MAX_PARTICLES * 3);
+      pAlphas = new Float32Array(MAX_PARTICLES);
+      pVelocities = new Float32Array(MAX_PARTICLES * 3);
+      pMaxOffset = new Float32Array(MAX_PARTICLES);
+      pDistance = new Float32Array(MAX_PARTICLES);
+      
+      // Initialize all particles as inactive
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        pAlphas[i] = 0;
+        pMaxOffset[i] = 0;
+        pDistance[i] = 0;
+      }
+      
+      pGeom.setAttribute('position', new THREE.BufferAttribute(pCurrentPositions, 3));
+      pGeom.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
+      pGeom.setAttribute('aAlpha', new THREE.BufferAttribute(pAlphas, 1));
+      pGeom.setAttribute('aDist', new THREE.BufferAttribute(pDistance, 1));
+
+      pMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uSize: { value: 3.0 },
+          uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
+        },
+        vertexShader: `
+          uniform float uSize; 
+          uniform float uPixelRatio;
+          attribute float aAlpha; 
+          attribute float aDist;
+          varying float vAlpha; 
+          varying vec3 vColor;
+          void main(){
+            vAlpha = aAlpha; 
+            vColor = color;
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            gl_Position = projectionMatrix * mvPosition;
+            // Gentle scale down for magical sparkle effect
+            float size = uSize * uPixelRatio * 60.0;
+            size = size / (aDist * 0.2 + 1.0); // Gentler scale down
+            size = size / max(1.0, -mvPosition.z);
+            gl_PointSize = clamp(size, 2.0, uSize * 6.0 * uPixelRatio); // Min size 2 for visibility
+          }
+        `,
+        fragmentShader: `
+          precision highp float; 
+          varying float vAlpha; 
+          varying vec3 vColor;
+          void main(){
+            vec2 uv = gl_PointCoord - 0.5;
+            float d = length(uv);
+            
+            // Sparkle effect with bright core and soft glow
+            float sparkle = exp(-d * 4.0); // Exponential falloff for soft glow
+            float core = smoothstep(0.5, 0.0, d); // Bright center
+            
+            // Mix sparkle and core for magical glow
+            float intensity = sparkle * 0.7 + core * 0.3;
+            
+            // Add color variation for shimmer
+            vec3 shimmer = vColor * (1.0 + core * 0.8);
+            shimmer += vec3(0.2, 0.3, 0.5) * sparkle * 0.3; // Blue tint in glow
+            
+            float a = vAlpha * intensity;
+            gl_FragColor = vec4(shimmer, a);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true
+      });
+      particles = new THREE.Points(pGeom, pMat);
+      particles.layers.set(1); // Particles on layer 1 (with bloom)
+      scene.add(particles);
+      // Build noise texture once
+      buildNoiseTexture(256);
+      noiseTex = new THREE.CanvasTexture(noiseCanvas);
+      noiseTex.wrapS = noiseTex.wrapT = THREE.RepeatWrapping;
+      noiseTex.needsUpdate = true;
+      // Attach to shader
+      if (shaderMat && shaderMat.uniforms && shaderMat.uniforms.uNoiseTex) {
+        shaderMat.uniforms.uNoiseTex.value = noiseTex;
+      }
+    }
+
+    function buildNoiseTexture(size = 256) {
+      noiseCanvas.width = size;
+      noiseCanvas.height = size;
+      // Perlin noise generation
+      const p = new Uint8Array(512);
+      for (let i = 0; i < 256; i++) p[i] = i;
+      for (let i = 0; i < 256; i++) { const j = (Math.random()*256)|0; const t = p[i]; p[i]=p[j]; p[j]=t; }
+      for (let i = 0; i < 256; i++) p[i+256]=p[i];
+      function fade(t){ return t*t*t*(t*(t*6.0-15.0)+10.0); }
+      function lerp(a,b,t){ return a + t*(b-a); }
+      function grad(hash,x,y){ const h = hash & 3; const u = h<2?x:y; const v = h<2?y:x; return ((h&1)?-u:u)+((h&2)?-2.0*v:2.0*v); }
+      function perlin2(x,y){
+        const X = Math.floor(x)&255, Y = Math.floor(y)&255;
+        const xf = x - Math.floor(x), yf = y - Math.floor(y);
+        const tl = p[p[X]+Y], tr = p[p[X+1]+Y], bl = p[p[X]+Y+1], br = p[p[X+1]+Y+1];
+        const u = fade(xf), v = fade(yf);
+        const x1 = lerp(grad(tl, xf, yf), grad(tr, xf-1.0, yf), u);
+        const x2 = lerp(grad(bl, xf, yf-1.0), grad(br, xf-1.0, yf-1.0), u);
+        const val = (lerp(x1,x2,v)+1.0)/2.0; // [0,1]
+        return val;
+      }
+      const img = noiseCtx.createImageData(size, size);
+      for (let y=0;y<size;y++){
+        for (let x=0;x<size;x++){
+          const i = (y*size+x)*4;
+          let n=0, amp=1, freq=1, norm=0;
+          for (let o=0;o<4;o++) { n += perlin2(x/64*freq, y/64*freq)*amp; norm += amp; amp*=0.5; freq*=2.0; }
+          n/=norm; const v = Math.max(0,Math.min(255, Math.floor(n*255)));
+          img.data[i]=img.data[i+1]=img.data[i+2]=v; img.data[i+3]=255;
+        }
+      }
+      noiseCtx.putImageData(img,0,0);
+    }
+
+    // 3D Perlin noise matching the shader implementation
+    function snoise3D(x, y, z) {
+      // Simplified 3D noise for JavaScript
+      const p = [x * 2.12, y * 2.12, z * 2.12];
+      const f = [
+        p[0] - Math.floor(p[0]),
+        p[1] - Math.floor(p[1]),
+        p[2] - Math.floor(p[2])
+      ];
+      const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+      const u = fade(f[0]);
+      const v = fade(f[1]);
+      const w = fade(f[2]);
+      
+      // Hash function for pseudo-random values
+      const hash = (x, y, z) => {
+        const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
+        return (n - Math.floor(n)) * 2.0 - 1.0;
+      };
+      
+      const i = [Math.floor(p[0]), Math.floor(p[1]), Math.floor(p[2])];
+      
+      // Calculate corner values
+      const a = hash(i[0], i[1], i[2]);
+      const b = hash(i[0] + 1, i[1], i[2]);
+      const c = hash(i[0], i[1] + 1, i[2]);
+      const d = hash(i[0] + 1, i[1] + 1, i[2]);
+      const e = hash(i[0], i[1], i[2] + 1);
+      const f1 = hash(i[0] + 1, i[1], i[2] + 1);
+      const g = hash(i[0], i[1] + 1, i[2] + 1);
+      const h = hash(i[0] + 1, i[1] + 1, i[2] + 1);
+      
+      // Trilinear interpolation
+      const x1 = a + u * (b - a);
+      const x2 = c + u * (d - c);
+      const y1 = x1 + v * (x2 - x1);
+      
+      const x3 = e + u * (f1 - e);
+      const x4 = g + u * (h - g);
+      const y2 = x3 + v * (x4 - x3);
+      
+      return (y1 + w * (y2 - y1)) * 0.5 + 0.5; // Normalize to 0-1
+    }
+    
+    // Sample noise with texture fallback
+    function sampleNoise(u, v, scale, time) {
+      // Use 3D noise matching the shader
+      const noiseValue = snoise3D(u * scale, v * scale, time * 0.15);
+      
+      // Mix with texture noise if available
+      if (noiseCtx) {
+        const size = noiseCanvas.width || 256;
+        const uu = (u * scale * 0.5 + time * 0.05) % 1.0;
+        const vv = (v * scale * 0.5) % 1.0;
+        const px = Math.floor(((uu < 0 ? uu + 1.0 : uu) % 1.0) * size);
+        const py = Math.floor(((vv < 0 ? vv + 1.0 : vv) % 1.0) * size);
+        const texNoise = noiseCtx.getImageData(px, py, 1, 1).data[0] / 255;
+        return noiseValue * 0.7 + texNoise * 0.3; // Mix both noise sources
+      }
+      
+      return noiseValue;
+    }
+
+    let particlePhase = 'idle'; // 'dissolve' | 'resolve' | 'idle'
+    // Emission tuning (dev adjustable)
+    let EMIT_DISSOLVE = 80;  // Particles for dissolve
+    let EMIT_RESOLVE = 150;  // Even more particles for better coverage
+    let DISSOLVE_MS = 1800;  // Dissolve duration
+    let RESOLVE_MS = 1000;   // Shorter emission window to finish before resolve completes
+
+    function emitEdgeParticles(count = 20) { // Much fewer particles per call
+      if (!frameMesh || !pGeom) return;
+      const width = frameMesh.geometry.parameters.width || imageFrameHeight;
+      const height = frameMesh.geometry.parameters.height || imageFrameHeight;
+      const hw = width / 2, hh = height / 2;
+      const imgW = colorCanvas.width || 1, imgH = colorCanvas.height || 1;
+      const progress = shaderMat.uniforms.uProgress.value;
+      const edge = shaderMat.uniforms.uEdge.value;
+      const scale = shaderMat.uniforms.uNoiseScale.value;
+      const time = shaderMat.uniforms.uTime.value;
+      
+      // For resolve, emit particles AHEAD of the resolve progress so they arrive on time
+      // For dissolve, emit from the current dissolving edge
+      const edgeStart = particlePhase === 'resolve' ? 
+        Math.max(0, progress - edge * 0.5) : // Only recently resolved areas
+        progress - edge * 1.5;
+      const edgeEnd = particlePhase === 'resolve' ? 
+        Math.min(1, progress + edge * 2.0) : // Emit well ahead of resolve
+        progress + edge * 1.5;
+      
+      // CRITICAL: Don't emit particles if resolve is almost complete
+      if (particlePhase === 'resolve' && progress < 0.15) {
+        return; // Stop emitting when resolve is nearly done
+      }
+
+      let emitted = 0, attempts = 0;
+      const maxAttempts = count * 100;
+      
+      while (emitted < count && attempts++ < maxAttempts) {
+        const u = Math.random();
+        const v = Math.random();
+        
+        const noiseValue = sampleNoise(u, v, scale, time);
+        
+        // Only emit from the dissolving edge band
+        const inEdgeBand = noiseValue >= edgeStart && noiseValue <= edgeEnd;
+        if (!inEdgeBand) continue;
+
+        // Find free particle slot (check alpha == 0)
+        let i = -1;
+        for (let k = 0; k < MAX_PARTICLES; k++) { 
+          if (pAlphas[k] <= 0) { i = k; break; }
+        }
+        if (i === -1) break;
+
+        const x = u * width - hw;
+        const y = (1.0 - v) * height - hh;
+        const z = 0.0;
+        const idx = i * 3;
+
+        // Initialize particle position
+        pInitPositions[idx] = x;
+        pInitPositions[idx+1] = y;
+        pInitPositions[idx+2] = z;
+        
+        if (particlePhase === 'resolve') {
+          // For resolve: Start particles from bottom-left, they'll fly TO form the edge
+          // Shorter distance for faster arrival
+          const offsetDistance = Math.random() * 1.5 + 1.0; // 1-2.5 units (closer start)
+          // Consistent bottom-left starting position
+          pCurrentPositions[idx] = x - offsetDistance; // Left of target
+          pCurrentPositions[idx+1] = y - offsetDistance * 1.2; // Below target
+          pCurrentPositions[idx+2] = Math.random() * 0.3 + 0.1; // Very close to plane
+          
+          // Set initial distance for proper fade
+          const dx = pCurrentPositions[idx] - x;
+          const dy = pCurrentPositions[idx+1] - y;
+          const dz = pCurrentPositions[idx+2] - z;
+          pDistance[i] = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        } else {
+          // For dissolve: Start at edge position
+          pCurrentPositions[idx] = x;
+          pCurrentPositions[idx+1] = y;
+          pCurrentPositions[idx+2] = z;
+          pDistance[i] = 0;
+        }
+
+        // Magical color palette
+        const px = Math.max(0, Math.min(imgW - 1, Math.floor(u * imgW)));
+        const py = Math.max(0, Math.min(imgH - 1, Math.floor(v * imgH)));
+        
+        // Beautiful gradient from cyan to purple to pink
+        const edgeFactor = 1.0 - Math.abs((noiseValue - progress) / edge);
+        const hue = (u * 0.3 + v * 0.2 + edgeFactor * 0.5) % 1.0;
+        
+        // Convert HSL to RGB for rainbow edge effect
+        const h = hue * 360;
+        const s = 0.8;
+        const l = 0.6 + edgeFactor * 0.2;
+        const chroma = (1 - Math.abs(2 * l - 1)) * s;
+        const hx = chroma * (1 - Math.abs((h / 60) % 2 - 1));
+        const m = l - chroma / 2;
+        
+        let r, g, b;
+        if (h < 60) { r = chroma; g = hx; b = 0; }
+        else if (h < 120) { r = hx; g = chroma; b = 0; }
+        else if (h < 180) { r = 0; g = chroma; b = hx; }
+        else if (h < 240) { r = 0; g = hx; b = chroma; }
+        else if (h < 300) { r = hx; g = 0; b = chroma; }
+        else { r = chroma; g = 0; b = hx; }
+        
+        // Mix with cool blue-purple tones for mystical effect
+        pColors[idx] = Math.min(1.0, (r + m + 0.4) * 1.2);
+        pColors[idx+1] = Math.min(1.0, (g + m + 0.6) * 1.2);
+        pColors[idx+2] = Math.min(1.0, (b + m + 0.9) * 1.2);
+        
+        // Start bright for resolve (particles form the edge), full for dissolve
+        pAlphas[i] = particlePhase === 'resolve' ? 1.0 : 1.0;
+        
+        // Velocity setup
+        if (particlePhase === 'resolve') {
+          // Initial velocity toward edge (will be recalculated each frame)
+          // Just set initial direction, update loop will handle precise targeting
+          pVelocities[idx] = 0;
+          pVelocities[idx+1] = 0;
+          pVelocities[idx+2] = 0;
+        } else {
+          // Flow outward to top-right for dissolve
+          const angleVariation = Math.random() * 0.4 - 0.2;
+          const baseAngle = Math.PI / 4; // 45 degrees (top-right)
+          const angle = baseAngle + angleVariation;
+          const speed = Math.random() * 2.0 + 1.0;
+          pVelocities[idx] = Math.cos(angle) * speed;
+          pVelocities[idx+1] = Math.sin(angle) * speed;
+          pVelocities[idx+2] = Math.random() * 0.5 + 0.5;
+        }
+        
+        // Set max offset distance
+        if (particlePhase === 'resolve') {
+          pMaxOffset[i] = pDistance[i]; // Use initial distance as max
+        } else {
+          pMaxOffset[i] = Math.random() * 2.0 + 1.5; // Shorter paths for dissolve
+          pDistance[i] = 0;
+        }
+        
+        emitted++;
+      }
+      
+      if (emitted > 0) {
+        pGeom.attributes.position.needsUpdate = true;
+        pGeom.attributes.color.needsUpdate = true;
+        pGeom.attributes.aAlpha.needsUpdate = true;
+        pGeom.attributes.aDist.needsUpdate = true;
+      }
+    }
+
+    // Clean up particles when phase changes
+    function clearParticles() {
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        pAlphas[i] = 0;
+        pDistance[i] = 0;
+      }
+      if (pGeom) {
+        pGeom.attributes.aAlpha.needsUpdate = true;
+        pGeom.attributes.aDist.needsUpdate = true;
+      }
+    }
+
+    // Calculate smooth wave offset for mystical motion
+    function calculateWaveOffset(i) {
+      const idx = i * 3;
+      const posx = pCurrentPositions[idx];
+      const posy = pCurrentPositions[idx + 1];
+      const time = shaderMat ? shaderMat.uniforms.uTime.value : 0;
+      
+      // Smooth, flowing sine waves for magical effect
+      const freq1 = 0.5; // Slower frequency for smooth motion
+      const freq2 = 0.3;
+      
+      // Create figure-8 and spiral patterns
+      const xwave = Math.sin(posy * freq1 + time * 0.5) * particleWaveAmplitude + 
+                    Math.cos(posy * freq2 * 2.0 + time * 0.3) * particleWaveAmplitude * 0.5;
+      
+      const ywave = Math.cos(posx * freq1 + time * 0.4) * particleWaveAmplitude * 0.7 + 
+                    Math.sin(posx * freq2 * 1.5 + time * 0.6) * particleWaveAmplitude * 0.3;
+      
+      return {
+        xwave: xwave * 0.02, // Gentle wave influence
+        ywave: ywave * 0.015
+      };
+    }
+    
+    function updateParticles(dt) {
+      if (!pGeom) return;
+      
+      // Emit particles continuously during dissolve/resolve
+      if (performance.now() < particleEmittingUntil) {
+        if (particlePhase === 'dissolve' || particlePhase === 'resolve') {
+          const emitCount = particlePhase === 'dissolve' ? EMIT_DISSOLVE : EMIT_RESOLVE;
+          const particlesPerFrame = Math.max(1, Math.floor(emitCount * dt * 60));
+          emitEdgeParticles(particlesPerFrame);
+        }
+      }
+      
+      // Update all active particles
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        if (pAlphas[i] > 0) {
+          const idx = i * 3;
+          
+          if (particlePhase === 'resolve') {
+            // STEP 1: Check if the target edge has already resolved
+            const progress = shaderMat ? shaderMat.uniforms.uProgress.value : 0;
+            const edge = shaderMat ? shaderMat.uniforms.uEdge.value : 0.06;
+            
+            // Calculate UV coordinates of target edge position
+            const width = frameMesh?.geometry?.parameters?.width || imageFrameHeight;
+            const height = frameMesh?.geometry?.parameters?.height || imageFrameHeight;
+            const u = (pInitPositions[idx] + width / 2) / width;
+            const v = 1.0 - ((pInitPositions[idx + 1] + height / 2) / height);
+            
+            // Sample noise at target position
+            const noiseValue = sampleNoise(u, v, shaderMat?.uniforms?.uNoiseScale?.value || 3.0, shaderMat?.uniforms?.uTime?.value || 0);
+            
+            // Check if this edge area is still active (not yet resolved)
+            const edgeStart = progress - edge;
+            const isEdgeActive = noiseValue >= edgeStart && noiseValue <= progress + edge * 0.5;
+            
+            // Also check if resolve is complete or nearly complete
+            const isResolveComplete = progress < 0.05;
+            
+            // STEP 2: Calculate distance to target
+            const dx = pInitPositions[idx] - pCurrentPositions[idx];
+            const dy = pInitPositions[idx + 1] - pCurrentPositions[idx + 1];
+            const dz = pInitPositions[idx + 2] - pCurrentPositions[idx + 2];
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            
+            // STEP 3: Decide movement based on edge status and distance
+            if (!isEdgeActive || dist < 0.15 || isResolveComplete) {
+              // Edge has resolved OR particle has arrived OR resolve is complete - lock in place
+              pCurrentPositions[idx] = pInitPositions[idx];
+              pCurrentPositions[idx + 1] = pInitPositions[idx + 1];
+              pCurrentPositions[idx + 2] = pInitPositions[idx + 2];
+              pDistance[i] = 0; // Mark as arrived/locked
+              
+              // If resolve is complete, immediately hide particle
+              if (isResolveComplete) {
+                pAlphas[i] = 0;
+              }
+            } else {
+              // Edge is still active and particle hasn't arrived - move toward it
+              const speed = 4.0; // Fast to beat the resolve
+              const vx = (dx / (dist + 0.001)) * speed * particleSpeedFactor;
+              const vy = (dy / (dist + 0.001)) * speed * particleSpeedFactor;
+              const vz = (dz / (dist + 0.001)) * speed * particleSpeedFactor;
+              
+              pCurrentPositions[idx] += vx;
+              pCurrentPositions[idx + 1] += vy;
+              pCurrentPositions[idx + 2] += vz;
+              pDistance[i] = dist;
+            }
+          } else {
+            // For dissolve: normal particle movement
+            const waves = calculateWaveOffset(i);
+            let vx = pVelocities[idx] + waves.xwave + 0.3;
+            let vy = pVelocities[idx + 1] + waves.ywave + 0.3;
+            let vz = pVelocities[idx + 2];
+            
+            pCurrentPositions[idx] += vx * particleSpeedFactor;
+            pCurrentPositions[idx + 1] += vy * particleSpeedFactor;
+            pCurrentPositions[idx + 2] += vz * particleSpeedFactor * 0.5;
+            
+            // Calculate new distance
+            const dx = pCurrentPositions[idx] - pInitPositions[idx];
+            const dy = pCurrentPositions[idx + 1] - pInitPositions[idx + 1];
+            const dz = pCurrentPositions[idx + 2] - pInitPositions[idx + 2];
+            pDistance[i] = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          }
+          
+          // Handle alpha based on particle state
+          if (particlePhase === 'resolve') {
+            const progress = shaderMat ? shaderMat.uniforms.uProgress.value : 0;
+            
+            // Immediately hide if resolve is complete
+            if (progress < 0.05) {
+              pAlphas[i] = 0;
+            } else if (pDistance[i] === 0) {
+              // Particle is locked - fade out rapidly
+              pAlphas[i] = Math.max(0, pAlphas[i] - 0.1);
+            } else if (pDistance[i] < 0.3) {
+              // Getting close - start fading
+              pAlphas[i] = (pDistance[i] / 0.3) * 0.8;
+            } else {
+              // Still traveling - fully visible
+              pAlphas[i] = 0.9;
+            }
+          } else {
+            // For dissolve: normal distance-based fade
+            if (pDistance[i] > pMaxOffset[i]) {
+              // Reset particle position
+              pCurrentPositions[idx] = pInitPositions[idx];
+              pCurrentPositions[idx + 1] = pInitPositions[idx + 1];
+              pCurrentPositions[idx + 2] = pInitPositions[idx + 2];
+              pDistance[i] = 0;
+            }
+            
+            const distanceRatio = pDistance[i] / pMaxOffset[i];
+            const distanceFade = Math.pow(Math.max(0, 1.0 - distanceRatio), 1.5);
+            pAlphas[i] = distanceFade * 0.8;
+          }
+          
+          // Deactivate if faded out
+          if (pAlphas[i] <= 0.01) {
+            pAlphas[i] = 0;
+          }
+        }
+      }
+      
+      // Update geometry attributes
+      pGeom.attributes.position.needsUpdate = true;
+      pGeom.attributes.aAlpha.needsUpdate = true;
+      pGeom.attributes.aDist.needsUpdate = true;
+    }
+
+    // Mouse interactions
+    let overControls = false;
+    function onMouseMove(e) {
+      if (overControls) return;
+      const nx = (e.clientX / window.innerWidth) * 2 - 1;   // [-1, 1]
+      const ny = (e.clientY / window.innerHeight) * 2 - 1;  // [-1, 1]
+      mouse.set(nx, ny);
+      // Tilt: invert previous mapping for both axes
+      targetRot.set(ny * MAX_TILT, nx * MAX_TILT);
+    }
+    function onPointerLeave() {
+      targetRot.set(0, 0);
+    }
+    function onWheel(e) {
+      camera.position.z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, camera.position.z + e.deltaY * ZOOM_SPEED));
+    }
+
+    // --- Speech Recognition (optional) ---
+    (function setupSpeech() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) { micBtn.style.display = 'none'; return; }
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      let listening = false;
+      recognition.onstart = () => { listening = true; micBtn.classList.add('is-listening'); showMessage('Listening...'); };
+      recognition.onend = () => { listening = false; micBtn.classList.remove('is-listening'); if (!promptInput.value) showMessage('Ready for the next edit!'); };
+      recognition.onresult = (e) => {
+        const t = e.results[0][0].transcript;
+        promptInput.value = t; checkForm(); showMessage(`Heard: "${t}"`);
+      };
+      recognition.onerror = (e) => { console.warn('Speech error', e.error); showMessage("Sorry, I didn't catch that.", true); };
+      micBtn.addEventListener('click', () => {
+        if (submitBtn.disabled || promptInput.disabled) return;
+        if (listening) recognition.stop(); else recognition.start();
+      });
+    })();
+
+    // --- Gemini API (image editing) ---
+    async function getApiClient() {
+      const keyFromInput = (apiKeyInput && apiKeyInput.value || '').trim();
+      const key = keyFromInput || localStorage.getItem('GEMINI_API_KEY');
+      if (!key) {
+        showMessage('Set API key (bottom-left) to edit.', true);
+        throw new Error('Missing API key');
+      }
+      return new GoogleGenAI({ apiKey: key });
+    }
+
+    async function handleSubmit() {
+      try {
+        if (!currentDataUrl || !promptInput.value) return;
+        setBusy(true);
+        showMessage('Editing with Gemini...');
+        const ai = await getApiClient();
+        // Start dissolve animation with edge particles
+        clearParticles(); // Clear any existing particles
+        particlePhase = 'dissolve';
+        particleEmittingUntil = performance.now() + DISSOLVE_MS;
+        const dissolvePromise = animateDissolveTo(1.0, DISSOLVE_MS/1000);
+        const { mimeType, base64 } = dataUrlToParts(currentDataUrl);
+        const contents = [
+          { text: promptInput.value },
+          { inlineData: { mimeType, data: base64 } },
+        ];
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image-preview',
+          contents,
+        });
+
+        // Find first image part
+        let newBase64 = null;
+        if (response && response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
+          for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData && part.inlineData.data) {
+              newBase64 = part.inlineData.data;
+              break;
+            }
+          }
+        }
+        if (!newBase64) throw new Error('No image returned. The request may have been blocked or mis-specified.');
+
+        // Assume PNG result
+        const newUrl = 'data:image/png;base64,' + newBase64;
+        currentDataUrl = newUrl;
+        
+        // Ensure dissolve finished before resolving new image
+        await dissolvePromise;
+        
+        // IMPORTANT: Load the NEW edited image while still dissolved
+        await setTextureFromDataUrl(currentDataUrl, true); // true = start dissolved
+        
+        // Resolve back with edge particles
+        clearParticles(); // Clear old particles
+        particlePhase = 'resolve';
+        // Stop emitting particles before resolve completes
+        particleEmittingUntil = performance.now() + RESOLVE_MS * 0.7; // Only emit for 70% of resolve time
+        await animateDissolveTo(0.0, RESOLVE_MS/1000 * 1.4); // Resolve takes 40% longer than emission
+        particlePhase = 'idle';
+        setTimeout(clearParticles, 1000); // Clean up after animation
+        showMessage('Edit complete.');
+      } catch (err) {
+        console.error(err);
+        showMessage(err.message || 'Edit failed.', true);
+        // resolve back in if we were mid-dissolve
+        await animateDissolveTo(0.0, 0.4);
+      } finally {
+        setBusy(false);
+        checkForm();
+      }
+    }
+
+    function animateDissolveTo(target, durationSec=0.3) {
+      return new Promise((resolve) => {
+        const start = shaderMat.uniforms.uProgress.value;
+        const delta = target - start;
+        const startTime = performance.now();
+        function step(t) {
+          const e = Math.min(1, (t - startTime) / (durationSec * 1000));
+          shaderMat.uniforms.uProgress.value = start + delta * e;
+          if (e < 1) requestAnimationFrame(step); else resolve();
+        }
+        requestAnimationFrame(step);
+      });
+    }
+
+    // --- Events ---
+    // Prefill API key from localStorage and set masking so placeholder is not masked when empty
+    function updateApiKeyUI() {
+      if (!apiKeyInput) return;
+      const hasValue = !!(apiKeyInput.value && apiKeyInput.value.trim().length);
+      // Show placeholder clearly when empty
+      apiKeyInput.type = hasValue ? 'password' : 'text';
+      // Toggle clear button
+      if (apiKeyClearBtn) apiKeyClearBtn.classList.toggle('hidden', !hasValue);
+    }
+    function persistApiKey() {
+      const val = (apiKeyInput.value || '').trim();
+      if (val) localStorage.setItem('GEMINI_API_KEY', val);
+      else localStorage.removeItem('GEMINI_API_KEY');
+    }
+    const storedKey = localStorage.getItem('GEMINI_API_KEY');
+    if (storedKey && apiKeyInput) apiKeyInput.value = storedKey;
+    updateApiKeyUI();
+    if (apiKeyInput) {
+      apiKeyInput.addEventListener('focus', () => { apiKeyInput.type = 'password'; });
+      apiKeyInput.addEventListener('blur', () => {
+        persistApiKey();
+        updateApiKeyUI();
+        showMessage(apiKeyInput.value ? 'API key saved.' : 'API key cleared.');
+        checkForm();
+      });
+      apiKeyInput.addEventListener('input', () => { persistApiKey(); updateApiKeyUI(); checkForm(); });
+    }
+    if (apiKeyClearBtn) {
+      apiKeyClearBtn.addEventListener('click', () => {
+        if (!apiKeyInput) return;
+        apiKeyInput.value = '';
+        persistApiKey();
+        updateApiKeyUI();
+        showMessage('API key removed.');
+        checkForm();
+      });
+    }
+
+    // Suspend tilt while hovering/focusing the toolbar
+    const controlsEl = document.getElementById('controls');
+    if (controlsEl) {
+      controlsEl.addEventListener('pointerenter', () => { overControls = true; targetRot.set(0,0); });
+      controlsEl.addEventListener('pointerleave', () => { overControls = false; });
+      controlsEl.addEventListener('focusin', () => { overControls = true; targetRot.set(0,0); });
+      controlsEl.addEventListener('focusout', () => {
+        if (!controlsEl.contains(document.activeElement)) overControls = false;
+      });
+    }
+    imageUpload.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      fileLabel.textContent = file.name;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        currentDataUrl = reader.result;
+        
+        // Load image with initial dissolved state
+        await setTextureFromDataUrl(currentDataUrl, true);
+        
+        // Animate resolve-in effect
+        clearParticles(); // Start fresh
+        particlePhase = 'resolve';
+        // Stop emitting particles before resolve completes
+        particleEmittingUntil = performance.now() + RESOLVE_MS * 0.7; // Only emit for 70% of resolve time
+        await animateDissolveTo(0.0, RESOLVE_MS/1000 * 1.4); // Resolve takes 40% longer than emission
+        particlePhase = 'idle';
+        setTimeout(clearParticles, 1000); // Clean up after animation
+        
+        promptInput.disabled = false;
+        checkForm();
+        showMessage('Image loaded. Describe your edit.');
+      };
+      reader.readAsDataURL(file);
+    });
+
+    promptInput.addEventListener('input', checkForm);
+    // Submit on Enter when typing prompt
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !submitBtn.disabled) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    });
+    submitBtn.addEventListener('click', handleSubmit);
+    downloadBtn.addEventListener('click', () => {
+      if (!currentDataUrl) return;
+      const a = document.createElement('a');
+      a.href = currentDataUrl;
+      a.download = 'edited-image.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+
+    // Create procedural outer space with stars
+    function createOuterSpace() {
+      // Dark space background
+      scene.fog = new THREE.FogExp2(0x000000, 0.00008);
+      
+      // Create starfield
+      const starsGeometry = new THREE.BufferGeometry();
+      const starCount = 15000;
+      const positions = new Float32Array(starCount * 3);
+      const colors = new Float32Array(starCount * 3);
+      const sizes = new Float32Array(starCount);
+      
+      for (let i = 0; i < starCount; i++) {
+        const i3 = i * 3;
+        // Distribute stars in a sphere
+        const radius = 200 + Math.random() * 800;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        
+        positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+        positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        positions[i3 + 2] = radius * Math.cos(phi);
+        
+        // Star colors - mostly white with some blue/yellow tints
+        const colorChoice = Math.random();
+        if (colorChoice < 0.7) {
+          // White stars
+          colors[i3] = 1.0;
+          colors[i3 + 1] = 1.0;
+          colors[i3 + 2] = 1.0;
+        } else if (colorChoice < 0.85) {
+          // Blue stars
+          colors[i3] = 0.7;
+          colors[i3 + 1] = 0.8;
+          colors[i3 + 2] = 1.0;
+        } else {
+          // Yellow/orange stars
+          colors[i3] = 1.0;
+          colors[i3 + 1] = 0.9;
+          colors[i3 + 2] = 0.7;
+        }
+        
+        // Random star sizes
+        sizes[i] = Math.random() * 3.0 + 0.5;
+      }
+      
+      starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      starsGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+      
+      // Star material with glow
+      const starsMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 }
+        },
+        vertexShader: `
+          attribute float size;
+          varying vec3 vColor;
+          void main() {
+            vColor = color;
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            gl_PointSize = size * (300.0 / -mvPosition.z);
+            gl_Position = projectionMatrix * mvPosition;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vColor;
+          void main() {
+            vec2 xy = gl_PointCoord.xy - vec2(0.5);
+            float r = length(xy);
+            if (r > 0.5) discard;
+            
+            // Soft glow
+            float intensity = 1.0 - smoothstep(0.0, 0.5, r);
+            intensity = pow(intensity, 2.0);
+            
+            gl_FragColor = vec4(vColor * intensity, intensity);
+          }
+        `,
+        transparent: true,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      
+      const stars = new THREE.Points(starsGeometry, starsMaterial);
+      stars.layers.set(0);
+      scene.add(stars);
+      
+      // Add some nebula clouds (very faint)
+      const nebulaCount = 5;
+      for (let i = 0; i < nebulaCount; i++) {
+        const nebulaGeo = new THREE.SphereGeometry(50 + Math.random() * 100, 8, 8);
+        const nebulaMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(0.2, 0.1, 0.3),
+          transparent: true,
+          opacity: 0.02,
+          side: THREE.BackSide
+        });
+        const nebula = new THREE.Mesh(nebulaGeo, nebulaMat);
+        nebula.position.set(
+          (Math.random() - 0.5) * 800,
+          (Math.random() - 0.5) * 800,
+          (Math.random() - 0.5) * 800
+        );
+        nebula.layers.set(0);
+        scene.add(nebula);
+      }
+      
+      // Animate stars
+      function animateStars() {
+        requestAnimationFrame(animateStars);
+        stars.rotation.y += 0.00005;
+        stars.rotation.x += 0.00002;
+      }
+      animateStars();
+    }
+    
+    // Init
+    initThree();
+    // Start with dissolve progress at 1 (fully dissolved) for initial image load effect
+    if (shaderMat) shaderMat.uniforms.uProgress.value = 1.0;
+    showMessage('Upload an image to begin.');
+    checkForm();
+
+  </script>
+<!-- partial -->
+  
+</body>
+</html>

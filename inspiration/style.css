@@ -1,0 +1,38 @@
+body { background:#111827; color:#F9FAFB; font-family:'Inter',sans-serif; overflow:hidden; }
+    #container { position:fixed; inset:0; z-index:0; }
+    .ui-container { position:relative; z-index:1; padding:1rem; display:flex; flex-direction:column; justify-content:flex-end; height:100vh; pointer-events:none; }
+    .ui-element { pointer-events:all; }
+    .glass-panel { background:rgba(255,255,255,0.05); backdrop-filter:blur(10px); border-radius:1rem; border:1px solid rgba(255,255,255,0.1); padding:1rem; box-shadow:0 8px 32px rgba(0,0,0,0.37); }
+    .btn { background:#4F46E5; color:#fff; padding:.75rem 1.25rem; border-radius:.5rem; font-weight:600; cursor:pointer; transition:.2s; border:none; white-space:nowrap; }
+    .btn:hover { background:#4338CA; transform:translateY(-2px); }
+    .btn:disabled { background:#374151; cursor:not-allowed; transform:none; }
+    #downloadBtn { background:#16A34A; } #downloadBtn:hover { background:#15803D; }
+    .file-input-wrapper{ position:relative; overflow:hidden; display:inline-block; }
+    .file-input-wrapper input[type=file]{ font-size:100px; position:absolute; left:0; top:0; opacity:0; cursor:pointer; }
+    .file-input-label{ background:#374151; color:white; padding:.75rem 1.25rem; border-radius:.5rem; cursor:pointer; display:inline-block; white-space:nowrap; }
+    .file-input-label:hover{ background:#4B5563; }
+    #micBtn { background:#374151; border-radius:9999px; padding:.75rem; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:.3s; }
+    #micBtn:hover { background:#4B5563; }
+    #micBtn.is-listening { background:#EF4444; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%{ box-shadow:0 0 0 0 rgba(239,68,68,.7);} 70%{ box-shadow:0 0 0 10px rgba(239,68,68,0);} 100%{ box-shadow:0 0 0 0 rgba(239,68,68,0);} }
+
+    /* Consistent button/interactive states */
+    .btn, .file-input-label, #micBtn, #apiKeyClearBtn {
+      cursor: pointer;
+      transition: background-color .2s ease, transform .1s ease, box-shadow .2s ease, opacity .2s ease;
+    }
+    .btn:hover, .file-input-label:hover, #micBtn:hover, #apiKeyClearBtn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0,0,0,.25);
+    }
+    .btn:active, #apiKeyClearBtn:active { transform: translateY(0); }
+    .btn:disabled, #downloadBtn:disabled, #submitBtn:disabled, #apiKeyClearBtn:disabled {
+      cursor: not-allowed;
+      opacity: .6;
+      transform: none;
+      box-shadow: none;
+    }
+    .btn:focus-visible, .file-input-label:focus-visible, #micBtn:focus-visible, #apiKeyClearBtn:focus-visible {
+      outline: 2px solid #818CF8; /* indigo-400 */
+      outline-offset: 2px;
+    }
