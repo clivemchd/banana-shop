@@ -50,6 +50,16 @@ action analyzeImageArea {
 	entities: [Image]
 }
 
+action uploadImageChunk {
+	fn: import { uploadImageChunk } from "@src/server/imageAnalysis",
+	entities: [Image]
+}
+
+action finalizeImageAnalysis {
+	fn: import { finalizeImageAnalysis } from "@src/server/imageAnalysis",
+	entities: [Image]
+}
+
 action uploadImage {
 	fn: import { uploadImage } from "@src/server/imageAnalysis",
 	entities: [Image]

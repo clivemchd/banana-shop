@@ -1,10 +1,15 @@
 import type { 
   AnalyzeImageArea,
-  UploadImage
+  UploadImage,
+  UploadImageChunk,
+  FinalizeImageAnalysis
 } from "wasp/server/operations";
 import type { Image } from "wasp/entities";
 import { HttpError } from "wasp/server";
-import { LMStudioClient } from "@lmstudio/sdk";
+import * as fal from "@fal-ai/serverless-client";
+
+// In-memory storage for chunked uploads (in production, use Redis or similar)
+const chunkStorage: Map<string, { chunks: string[], totalChunks: number, selection?: any }> = new Map();
 
 type AnalyzeImageAreaArgs = {
   fullImageUrl: string;
@@ -22,6 +27,18 @@ type UploadImageArgs = {
   description?: string;
 };
 
+type UploadImageChunkArgs = {
+  uploadId: string;
+  chunkIndex: number;
+  totalChunks: number;
+  chunkData: string;
+  selection?: any;
+};
+
+type FinalizeImageAnalysisArgs = {
+  uploadId: string;
+};
+
 export const analyzeImageArea: AnalyzeImageArea = async (args) => {
   try {
     const { imageData, selection } = args;
@@ -37,8 +54,9 @@ export const analyzeImageArea: AnalyzeImageArea = async (args) => {
     const imageDataStr = imageData as string;
     console.log('Received full quality cropped image, length:', imageDataStr.length);
     
-    // Call the AI analysis with the cropped image
-    const result = await analyzeWithVisionAI(imageDataStr, selection);
+    // Call the AI analysis with the image containing the red dotted marking
+    // For fal.ai, we send the full image with the marked area
+    const result = await analyzeWithFalAI(imageDataStr, selection);
     return result;
   } catch (error) {
     console.error('Error in analyzeImageArea:', error);
@@ -47,6 +65,71 @@ export const analyzeImageArea: AnalyzeImageArea = async (args) => {
   }
 };
 
+export const uploadImageChunk: UploadImageChunk<UploadImageChunkArgs, any> = async ({ 
+  uploadId, 
+  chunkIndex, 
+  totalChunks, 
+  chunkData,
+  selection 
+}, context) => {
+  try {
+    console.log(`📦 Uploading chunk ${chunkIndex + 1}/${totalChunks} for upload ${uploadId}`);
+    
+    if (!chunkStorage.has(uploadId)) {
+      chunkStorage.set(uploadId, { 
+        chunks: new Array(totalChunks).fill(''),
+        totalChunks,
+        selection
+      });
+    }
+    
+    const uploadData = chunkStorage.get(uploadId)!;
+    uploadData.chunks[chunkIndex] = chunkData;
+    
+    // Check if all chunks are received
+    const receivedChunks = uploadData.chunks.filter(chunk => chunk !== '').length;
+    
+    return {
+      success: true,
+      receivedChunks,
+      totalChunks,
+      isComplete: receivedChunks === totalChunks
+    };
+  } catch (error) {
+    console.error('Error uploading chunk:', error);
+    throw new HttpError(500, "Failed to upload chunk");
+  }
+};
+
+export const finalizeImageAnalysis: FinalizeImageAnalysis<FinalizeImageAnalysisArgs, any> = async ({ uploadId }, context) => {
+  try {
+    console.log(`🔄 Finalizing analysis for upload ${uploadId}`);
+    
+    const uploadData = chunkStorage.get(uploadId);
+    if (!uploadData) {
+      throw new HttpError(404, "Upload not found");
+    }
+    
+    // Reconstruct the full image
+    const fullImageData = uploadData.chunks.join('');
+    console.log(`✅ Reconstructed image, total length: ${fullImageData.length}`);
+    
+    // Analyze with fal.ai
+    const result = await analyzeWithFalAI(fullImageData, uploadData.selection);
+    
+    // Clean up storage
+    chunkStorage.delete(uploadId);
+    
+    return {
+      success: true,
+      analysis: result
+    };
+  } catch (error) {
+    console.error('❌ Error finalizing image analysis:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new HttpError(500, `Failed to finalize analysis: ${errorMessage}`);
+  }
+};
 export const uploadImage: UploadImage<UploadImageArgs, any> = async (
   { imageData, description },
   context
@@ -73,88 +156,77 @@ export const uploadImage: UploadImage<UploadImageArgs, any> = async (
       imageId: image.id,
       imageUrl: image.url
     };
-
   } catch (error) {
     console.error('Error uploading image:', error);
     throw new HttpError(500, "Failed to upload image");
   }
 };
 
-async function analyzeWithVisionAI(
-  croppedImageUrl: string, 
+async function analyzeWithFalAI(
+  imageWithMarkingUrl: string, 
   selection: {x: number, y: number, width: number, height: number}
 ): Promise<string> {
   try {
-    console.log('🔍 Analyzing with LM Studio...');
+    console.log('🔍 Analyzing with fal.ai SA2VA model...');
     console.log('📐 Selection area:', selection);
-    console.log('✂️ Cropped image length:', croppedImageUrl.length);
+    console.log('🖼️ Image with marking length:', imageWithMarkingUrl.length);
     
-    // Check if we have a valid data URL
-    if (!croppedImageUrl.startsWith('data:image/')) {
-      throw new Error('Invalid image format - not a data URL');
-    }
-    
-    console.log('🔧 Using direct HTTP API call to LM Studio...');
-    console.log('📸 Cropped image preview:', croppedImageUrl.substring(0, 100) + '...');
-    
-    // Use direct HTTP API call to LM Studio's OpenAI-compatible endpoint
-    const requestBody = {
-      model: 'minicpm-o-2_6',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'What do you see in this image? Describe it in detail, including any objects, colors, text, people, or activities visible.'
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: croppedImageUrl  // Use the full data URL including the header
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 500,
-      temperature: 0.1
-    };
-
-    console.log('📤 Sending request to LM Studio...');
-    
-    const response = await fetch('http://localhost:1234/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
+    // Configure fal.ai client
+    fal.config({
+      credentials: process.env.FAL_KEY || 'your-fal-api-key'
     });
 
-    console.log('📡 Response status:', response.status);
+    const analysisPrompt = `Analyze the area marked by the red dotted line and provide a detailed analysis including:
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ HTTP error response:', errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
-    }
+Object Identification: What specific object(s), person(s), or element(s) are contained within the marked area?
 
-    const result = await response.json();
-    console.log('✅ Got response from LM Studio via HTTP API');
+Physical Description: Describe the visual characteristics - colors, textures, shapes, size relative to the image, condition/state.
+
+Contextual Relationship: How does this marked element relate to and interact with the surrounding elements in the full image?
+
+Spatial Analysis: Where is this positioned in the image (foreground/background, left/right, etc.) and what is its relationship to nearby objects?
+
+Functional Analysis: What is the purpose or function of this element? What might it be used for?
+
+Environmental Context: What does this tell us about the setting, time period, or situation depicted in the image?
+
+Notable Details: Are there any text, logos, distinctive features, or unusual characteristics visible in this area?
+
+Emotional/Atmospheric Context: What mood, emotion, or atmosphere does this element contribute to the overall image?
+
+Technical Observations: Comment on lighting, focus, image quality, or photographic aspects specific to this region.
+
+Please be as specific and detailed as possible, noting even small details that might be significant.`;
+
+    console.log('� Sending request to fal.ai SA2VA model...');
+    
+    const result = await fal.subscribe("fal-ai/sa2va/8b/image", {
+      input: {
+        image_url: imageWithMarkingUrl,
+        prompt: analysisPrompt
+      }
+    });
+
+    console.log('✅ Got response from fal.ai');
     console.log('📄 Full response:', JSON.stringify(result, null, 2));
 
-    if (result.choices && result.choices[0] && result.choices[0].message) {
-      const content = result.choices[0].message.content;
-      console.log('💬 AI Response:', content);
-      return content || "Unable to analyze the selected area.";
+    const resultData = result as any;
+    if (resultData.data && resultData.data.output) {
+      const analysis = resultData.data.output;
+      console.log('💬 AI Analysis:', analysis);
+      return analysis;
+    } else if (resultData.output) {
+      const analysis = resultData.output;
+      console.log('💬 AI Analysis:', analysis);
+      return analysis;
     } else {
       console.error('❌ Invalid response format:', result);
-      throw new Error('Invalid response format from LM Studio');
+      throw new Error('Invalid response format from fal.ai');
     }
 
   } catch (error) {
-    console.error('❌ LM Studio HTTP API call failed:', error);
+    console.error('❌ fal.ai API call failed:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return `Unable to analyze the selected area using local LM Studio model. Please ensure LM Studio is running with the MiniCPM-o-2_6 model loaded. Error: ${errorMessage}`;
+    return `Unable to analyze the selected area using fal.ai SA2VA model. Please check your API key and try again. Error: ${errorMessage}`;
   }
 }

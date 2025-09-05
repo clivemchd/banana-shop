@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { analyzeImageArea, uploadImage } from 'wasp/client/operations';
+import { analyzeImageArea, uploadImage, uploadImageChunk, finalizeImageAnalysis } from 'wasp/client/operations';
 
 interface SelectionArea {
   x: number;
@@ -18,6 +18,9 @@ export const ImageAnalyzerPage = () => {
   const [analysis, setAnalysis] = useState<string>('');
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [croppedImagePreview, setCroppedImagePreview] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [currentUploadId, setCurrentUploadId] = useState<string | null>(null);
   
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -169,126 +172,175 @@ export const ImageAnalyzerPage = () => {
     });
   }, []);
 
+  const uploadImageInChunks = useCallback(async (imageData: string, selection: SelectionArea): Promise<string> => {
+    const CHUNK_SIZE = 50000; // ~50KB per chunk
+    const chunks: string[] = [];
+    
+    // Split image data into chunks
+    for (let i = 0; i < imageData.length; i += CHUNK_SIZE) {
+      chunks.push(imageData.slice(i, i + CHUNK_SIZE));
+    }
+    
+    const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const totalChunks = chunks.length;
+    
+    console.log(`📦 Starting chunked upload: ${totalChunks} chunks, ${imageData.length} total bytes`);
+    
+    setCurrentUploadId(uploadId);
+    setUploadProgress({ current: 0, total: totalChunks });
+    
+    try {
+      // Upload chunks with pause functionality
+      for (let i = 0; i < chunks.length; i++) {
+        // Check if upload is paused
+        while (isPaused) {
+          console.log('⏸️ Upload paused, waiting...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        console.log(`📤 Uploading chunk ${i + 1}/${totalChunks}`);
+        
+        const result = await uploadImageChunk({
+          uploadId,
+          chunkIndex: i,
+          totalChunks,
+          chunkData: chunks[i],
+          selection
+        } as any);
+        
+        setUploadProgress({ current: i + 1, total: totalChunks });
+        
+        if (!result.success) {
+          throw new Error(`Failed to upload chunk ${i + 1}`);
+        }
+        
+        // Small delay to prevent overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      console.log('✅ All chunks uploaded, finalizing analysis...');
+      
+      // Finalize the analysis
+      const analysisResult = await finalizeImageAnalysis({ uploadId } as any);
+      
+      if (analysisResult.success) {
+        return analysisResult.analysis;
+      } else {
+        throw new Error('Failed to finalize analysis');
+      }
+      
+    } catch (error) {
+      console.error('❌ Chunked upload failed:', error);
+      throw error;
+    } finally {
+      setCurrentUploadId(null);
+      setUploadProgress(null);
+    }
+  }, [isPaused]);
+
+  const pauseUpload = useCallback(() => {
+    setIsPaused(true);
+  }, []);
+
+  const resumeUpload = useCallback(() => {
+    setIsPaused(false);
+  }, []);
+
+  const cancelUpload = useCallback(() => {
+    setIsPaused(false);
+    setCurrentUploadId(null);
+    setUploadProgress(null);
+    setIsAnalyzing(false);
+  }, []);
+
   const handleAnalyzeSelection = useCallback(async () => {
-    if (!selection || !uploadedImage || !imageRef.current) return;
+    if (!selection || !uploadedImage) return;
     
     setIsAnalyzing(true);
+    setAnalysis('');
+    
     try {
-      // Create a temporary canvas to load the original image at full resolution
-      const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d')!;
-      const tempImg = new Image();
+      // Create image element to work with
+      const img = new Image();
       
-      // Load the original image
-      tempImg.onload = async () => {
-        tempCanvas.width = tempImg.naturalWidth;
-        tempCanvas.height = tempImg.naturalHeight;
-        tempCtx.drawImage(tempImg, 0, 0);
-        
-        // Now crop using the original selection coordinates (no scaling needed)
-        const cropCanvas = document.createElement('canvas');
-        const cropCtx = cropCanvas.getContext('2d')!;
-        
-        cropCanvas.width = selection.width;
-        cropCanvas.height = selection.height;
-        
-        // Crop from the full-resolution image using original coordinates
-        cropCtx.drawImage(
-          tempCanvas,
-          selection.x, selection.y, selection.width, selection.height, // Source (natural coordinates)
-          0, 0, selection.width, selection.height                      // Destination
-        );
-        
-        const croppedImageDataUrl = cropCanvas.toDataURL('image/jpeg', 0.9);
-        
-        // Debug: log cropped image info
-        console.log('🖼️ Cropped image size:', selection.width, 'x', selection.height);
-        console.log('✂️ Cropped image data length:', croppedImageDataUrl.length);
-        
-        // Optional: Create a temporary link to download and verify the cropped image
-        if (window.location.search.includes('debug=true')) {
-          const link = document.createElement('a');
-          link.href = croppedImageDataUrl;
-          link.download = `cropped-${Date.now()}.jpg`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          console.log('📥 Downloaded cropped image for debugging');
-        }
-        
-        // Upload the cropped image
-        const base64Content = croppedImageDataUrl.split(',')[1];
-        // Convert selected area to base64 directly from the original image
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx || !uploadedImage) {
-          throw new Error('Cannot get canvas context or missing image');
-        }
-        
-        // Create image element to work with
-        const img = new Image();
-        
-        img.onload = async () => {
-          try {
-            // Use original image coordinates directly
-            canvas.width = selection.width;
-            canvas.height = selection.height;
-            
-            // Draw the selected area onto the canvas with full quality
-            ctx.drawImage(
-              img,
-              selection.x, selection.y, selection.width, selection.height,
-              0, 0, selection.width, selection.height
-            );
-            
-            // Convert to high quality PNG
-            const fullQualityImageData = canvas.toDataURL('image/png', 1.0);
-            
-            // Save the cropped image for preview
-            setCroppedImagePreview(fullQualityImageData);
-            
-            console.log('Original image size:', img.width, 'x', img.height);
-            console.log('Selected area:', selection);
-            console.log('Cropped data length:', fullQualityImageData.length);
-            
-            // Now analyze with the full quality cropped image
-            const result = await analyzeImageArea({
-              imageData: fullQualityImageData,
-              selection: selection
-            });
-            
-            setAnalysis(typeof result === 'string' ? result : 'Analysis completed');
-            setIsAnalyzing(false);
-          } catch (error) {
-            console.error('Error processing image:', error);
-            setIsAnalyzing(false);
+      img.onload = async () => {
+        try {
+          // Create a canvas with the full image and red dotted overlay
+          const fullCanvas = document.createElement('canvas');
+          const fullCtx = fullCanvas.getContext('2d');
+          
+          if (!fullCtx) {
+            throw new Error('Cannot get full canvas context');
           }
-        };
-        
-        img.onerror = () => {
-          console.error('Failed to load image');
+          
+          // Set canvas to original image size
+          fullCanvas.width = img.naturalWidth;
+          fullCanvas.height = img.naturalHeight;
+          
+          // Draw the original image
+          fullCtx.drawImage(img, 0, 0);
+          
+          // Draw red dotted outline around selected area
+          fullCtx.strokeStyle = '#dc2626';
+          fullCtx.lineWidth = 4;
+          fullCtx.setLineDash([10, 5]);
+          fullCtx.strokeRect(selection.x, selection.y, selection.width, selection.height);
+          
+          // Convert to base64
+          const imageWithMarking = fullCanvas.toDataURL('image/png', 1.0);
+          
+          // Also create the cropped area separately for preview
+          const cropCanvas = document.createElement('canvas');
+          const cropCtx = cropCanvas.getContext('2d');
+          
+          if (!cropCtx) {
+            throw new Error('Cannot get crop canvas context');
+          }
+          
+          cropCanvas.width = selection.width;
+          cropCanvas.height = selection.height;
+          
+          // Draw the selected area onto the canvas with full quality
+          cropCtx.drawImage(
+            img,
+            selection.x, selection.y, selection.width, selection.height,
+            0, 0, selection.width, selection.height
+          );
+          
+          const croppedPreview = cropCanvas.toDataURL('image/png', 1.0);
+          
+          // Save the cropped image for preview
+          setCroppedImagePreview(croppedPreview);
+          
+          console.log('Original image size:', img.naturalWidth, 'x', img.naturalHeight);
+          console.log('Selected area:', selection);
+          console.log('Full image with marking length:', imageWithMarking.length);
+          console.log('Cropped preview length:', croppedPreview.length);
+          
+          // Use chunked upload for large images
+          const result = await uploadImageInChunks(imageWithMarking, selection);
+          
+          setAnalysis(typeof result === 'string' ? result : 'Analysis completed');
           setIsAnalyzing(false);
-        };
-        
-        img.src = uploadedImage;
+        } catch (error) {
+          console.error('Error processing image:', error);
+          setIsAnalyzing(false);
+        }
       };
       
-      tempImg.onerror = () => {
-        console.error('Failed to load image for cropping');
-        alert('Failed to process image for analysis');
+      img.onerror = () => {
+        console.error('Failed to load image');
         setIsAnalyzing(false);
       };
       
-      // Load the original uploaded image
-      tempImg.src = uploadedImage;
+      img.src = uploadedImage;
       
     } catch (error) {
-      console.error('Analysis failed:', error);
+      console.error('Failed to analyze image area:', error);
       alert('Failed to analyze image area');
       setIsAnalyzing(false);
     }
-  }, [selection, uploadedImage]);
+  }, [selection, uploadedImage, uploadImageInChunks]);
 
   const getSelectionStyle = useCallback(() => {
     if (!displaySelection) return {};
@@ -299,8 +351,8 @@ export const ImageAnalyzerPage = () => {
       top: displaySelection.y,
       width: displaySelection.width,
       height: displaySelection.height,
-      border: '2px solid #3b82f6',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      border: '3px dashed #dc2626',
+      backgroundColor: 'rgba(220, 38, 38, 0.1)',
       pointerEvents: 'none' as const,
     };
   }, [displaySelection]);
@@ -311,7 +363,7 @@ export const ImageAnalyzerPage = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
           Image Area Analyzer
           <span className="block text-sm font-normal text-gray-500 mt-2">
-            Powered by LM Studio MiniCPM-o-2_6 Vision Model
+            Powered by fal.ai SA2VA Vision Model
           </span>
         </h1>
         
@@ -344,7 +396,7 @@ export const ImageAnalyzerPage = () => {
           {uploadedImage && (
             <div className="mb-6">
               <p className="text-sm text-gray-600 mb-4">
-                Click and drag to select an area for analysis
+                Click and drag to select an area for analysis (marked with red dotted line)
               </p>
               <div
                 ref={containerRef}
@@ -374,11 +426,55 @@ export const ImageAnalyzerPage = () => {
                 disabled={isAnalyzing}
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-colors"
               >
-                {isAnalyzing ? 'Analyzing with LM Studio...' : 'Analyze with Local AI Model'}
+                {isAnalyzing ? 'Analyzing with fal.ai...' : 'Analyze with fal.ai SA2VA Model'}
               </button>
               <p className="text-sm text-gray-500 mt-2">
-                🔍 Both full image (context) and cropped area sent to MiniCPM-o-2_6
+                🔍 Selected area analyzed with detailed fal.ai SA2VA vision model
               </p>
+            </div>
+          )}
+
+          {/* Upload Progress */}
+          {uploadProgress && (
+            <div className="mb-6 bg-blue-50 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                Upload Progress
+              </h3>
+              <div className="w-full bg-blue-200 rounded-full h-2.5 mb-4">
+                <div 
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                  style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between items-center text-sm text-blue-700">
+                <span>
+                  Chunk {uploadProgress.current} of {uploadProgress.total}
+                  {isPaused && ' (Paused)'}
+                </span>
+                <div className="space-x-2">
+                  {!isPaused ? (
+                    <button
+                      onClick={pauseUpload}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded"
+                    >
+                      ⏸️ Pause
+                    </button>
+                  ) : (
+                    <button
+                      onClick={resumeUpload}
+                      className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded"
+                    >
+                      ▶️ Resume
+                    </button>
+                  )}
+                  <button
+                    onClick={cancelUpload}
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
+                  >
+                    ❌ Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
