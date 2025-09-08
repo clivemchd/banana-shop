@@ -2,6 +2,7 @@ import "../../../index.css";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { cn } from "../../../lib/utils";
+import { Environment } from "../../utils/environment";
 import {
   Card,
   CardContent,
@@ -35,8 +36,15 @@ export const ForgotPasswordPage = () => {
     try {
       // Note: This is a placeholder for when Wasp's requestPasswordReset is configured
       // For now, we'll simulate the behavior in development
-      console.log("Password reset requested for:", email);
-      setMessage("If an account with this email exists, you will receive a password reset link.");
+      if (Environment.isDevelopment) {
+        console.log("Password reset requested for:", email);
+        console.log("In development mode - password reset email would be sent to:", email);
+        setMessage("Development mode: Check the console for the password reset link. In production, an email would be sent.");
+      } else {
+        // In production, this would call the actual Wasp password reset function
+        console.log("Password reset requested for:", email);
+        setMessage("If an account with this email exists, you will receive a password reset link.");
+      }
       setEmail("");
     } catch (error: any) {
       // Use generic message for security - don't confirm if email exists
