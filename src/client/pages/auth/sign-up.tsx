@@ -37,15 +37,19 @@ export const SignUpPage = () => {
     setError(null);
     setIsLoading(true);
 
-    // Client-side validation
-    if (!email || !email.includes('@')) {
+    // Client-side validation following Wasp security protocols
+    
+    // Email validation (must be valid email)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
       setError("Please enter a valid email address");
       setIsLoading(false);
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
+    // Password validation (at least 8 characters and contain a number)
+    if (!password) {
+      setError("Password is required");
       setIsLoading(false);
       return;
     }
@@ -56,12 +60,33 @@ export const SignUpPage = () => {
       return;
     }
 
+    if (!/\d/.test(password)) {
+      setError("Password must contain at least one number");
+      setIsLoading(false);
+      return;
+    }
+
+    // Confirm password validation
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      setIsLoading(false);
+      return;
+    }
+
     try {
+      // For email auth, we still use username field but pass the email
+      // This follows Wasp's internal structure for email authentication
       await signup({ username: email, password });
-      await login({ username: email, password });
+      // Auto-login after successful signup
+      await login({ email, password });
       navigate("/");
     } catch (error: any) {
-      setError(error.message || "An error occurred during signup");
+      // Secure error handling - don't expose sensitive information
+      if (error.message?.includes("already exists") || error.message?.includes("duplicate")) {
+        setError("An account with this email already exists");
+      } else {
+        setError(error.message || "An error occurred during signup");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +166,7 @@ export const SignUpPage = () => {
                       </TooltipProvider>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Password must be at least 8 characters long
+                      Password must be at least 8 characters long and contain at least one number
                     </p>
                   </div>
 
