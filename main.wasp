@@ -9,13 +9,27 @@ app MicroBanana {
 	auth: {
 		userEntity: Users,
 		methods: {
-			usernameAndPassword: {},
+			email: {
+				fromField: {
+					name: "Micro Banana",
+					email: "noreply@microbanana.com"
+				},
+				emailVerification: {
+					clientRoute: EmailVerificationRoute
+				},
+				passwordReset: {
+					clientRoute: PasswordResetRoute
+				}
+			},
 			google: {
 				configFn: import { getConfig } from "@src/server/auth/google",
 				userSignupFields: import { userSignupFields } from "@src/server/auth/google"
 			}
 		},
 		onAuthFailedRedirectTo: "/signin"
+	},
+	emailSender: {
+		provider: Dummy
 	}
 }
 
@@ -27,6 +41,21 @@ page SignUpPage {
 route SignInPageRoute { path: "/signin", to: SignInPage }
 page SignInPage {
   component: import { SignInPage } from "@src/client/pages/auth/sign-in"
+}
+
+route ForgotPasswordRoute { path: "/forgot-password", to: ForgotPasswordPage }
+page ForgotPasswordPage {
+  component: import { ForgotPasswordPage } from "@src/client/pages/auth/forgot-password"
+}
+
+route PasswordResetRoute { path: "/password-reset", to: PasswordResetPage }
+page PasswordResetPage {
+  component: import { PasswordResetPage } from "@src/client/pages/auth/password-reset"
+}
+
+route EmailVerificationRoute { path: "/email-verification", to: EmailVerificationPage }
+page EmailVerificationPage {
+  component: import { EmailVerificationPage } from "@src/client/pages/auth/email-verification"
 }
 
 route DashboardPageRoute { path: "/", to: DashboardPage }

@@ -35,11 +35,30 @@ export const SignInPage = () => {
     setError(null);
     setIsLoading(true);
 
+    // Client-side validation following Wasp security protocols
+    
+    // Email validation (must be valid email)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      setError("Please enter a valid email address");
+      setIsLoading(false);
+      return;
+    }
+
+    // Password validation (must not be empty)
+    if (!password) {
+      setError("Password is required");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      await login({ username: email, password });
+      await login({ email, password });
       navigate("/");
     } catch (error: any) {
-      setError(error.message || "An error occurred during login");
+      // Secure error handling - don't expose sensitive information
+      // Use generic message to prevent user enumeration attacks
+      setError("Invalid email or password");
     } finally {
       setIsLoading(false);
     }
@@ -86,12 +105,12 @@ export const SignInPage = () => {
                   <div className="grid gap-2">
                     <div className="flex items-center">
                       <Label htmlFor="password">Password</Label>
-                      <a
-                        href="#"
+                      <Link
+                        to="/forgot-password"
                         className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
                       >
                         Forgot your password?
-                      </a>
+                      </Link>
                     </div>
                     <div className="relative">
                       <Input
