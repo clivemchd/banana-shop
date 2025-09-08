@@ -19,6 +19,6 @@ model Users {
 	id String @id @default(uuid())
 	images Image[]
 	isAdmin  Boolean @default(false)
-	email String? @unique
+	email String @unique
 	username String? @unique
 }

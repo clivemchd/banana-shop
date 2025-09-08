@@ -10,7 +10,10 @@ app MicroBanana {
 		userEntity: Users,
 		methods: {
 			usernameAndPassword: {},
-			google: {}
+			google: {
+				configFn: import { getConfig } from "@src/server/auth/google",
+				userSignupFields: import { userSignupFields } from "@src/server/auth/google"
+			}
 		},
 		onAuthFailedRedirectTo: "/signin"
 	}

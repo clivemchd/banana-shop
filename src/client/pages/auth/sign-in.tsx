@@ -16,7 +16,7 @@ import { Label } from "../../components/ui/label";
 import { Separator } from "../../components/ui/separator";
 
 export const SignInPage = () => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +28,7 @@ export const SignInPage = () => {
     setIsLoading(true);
 
     try {
-      await login({ username, password });
+      await login({ username: email, password });
       navigate("/");
     } catch (error: any) {
       setError(error.message || "An error occurred during login");
@@ -59,17 +59,17 @@ export const SignInPage = () => {
                     </div>
                   )}
 
-                  {/* Username Field */}
+                  {/* Email Field */}
                   <div className="grid gap-2">
-                    <Label htmlFor="username">Username</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
-                      id="username"
-                      type="text"
-                      placeholder="Enter your username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
-                      autoComplete="username"
+                      autoComplete="email"
                       disabled={isLoading}
                     />
                   </div>

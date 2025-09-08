@@ -16,7 +16,7 @@ import { Label } from "../../components/ui/label";
 import { Separator } from "../../components/ui/separator";
 
 export const SignUpPage = () => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +29,12 @@ export const SignUpPage = () => {
     setIsLoading(true);
 
     // Client-side validation
+    if (!email || !email.includes('@')) {
+      setError("Please enter a valid email address");
+      setIsLoading(false);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       setIsLoading(false);
@@ -42,8 +48,8 @@ export const SignUpPage = () => {
     }
 
     try {
-      await signup({ username, password });
-      await login({ username, password });
+      await signup({ username: email, password });
+      await login({ username: email, password });
       navigate("/");
     } catch (error: any) {
       setError(error.message || "An error occurred during signup");
@@ -74,17 +80,17 @@ export const SignUpPage = () => {
                     </div>
                   )}
 
-                  {/* Username Field */}
+                  {/* Email Field */}
                   <div className="grid gap-2">
-                    <Label htmlFor="username">Username</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
-                      id="username"
-                      type="text"
-                      placeholder="Enter your username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
-                      autoComplete="username"
+                      autoComplete="email"
                       disabled={isLoading}
                     />
                   </div>
