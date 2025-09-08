@@ -19,4 +19,6 @@ model Users {
 	id Int @id @default(autoincrement())
 	images Image[]
 	isAdmin  Boolean @default(false)
+	email String? @unique
+	username String? @unique
 }
