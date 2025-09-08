@@ -9,7 +9,8 @@ app MicroBanana {
 	auth: {
 		userEntity: Users,
 		methods: {
-			usernameAndPassword: {}
+			usernameAndPassword: {},
+			google: {}
 		},
 		onAuthFailedRedirectTo: "/signin"
 	}
