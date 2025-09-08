@@ -1,0 +1,29 @@
+// Environment detection utility for client side
+export const Environment = {
+  isDevelopment: import.meta.env.DEV,
+  isProduction: import.meta.env.PROD,
+  mode: import.meta.env.MODE,
+  
+  // Vite provides these automatically:
+  // import.meta.env.DEV - true in development
+  // import.meta.env.PROD - true in production
+  // import.meta.env.MODE - 'development' or 'production'
+  
+  // You can also add custom environment variables in .env.client
+  // They must be prefixed with REACT_APP_ to be available in client
+  getClientVar: (key: string) => {
+    return import.meta.env[`REACT_APP_${key}`];
+  }
+};
+
+// Example usage:
+export const config = {
+  apiUrl: Environment.isDevelopment 
+    ? 'http://localhost:3001'
+    : 'https://your-production-api.com',
+    
+  enableDebugLogs: Environment.isDevelopment,
+  
+  // For development, use dummy email provider (already configured in main.wasp)
+  emailProvider: Environment.isDevelopment ? 'dummy' : 'production'
+};
