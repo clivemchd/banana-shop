@@ -1,3 +1,4 @@
+import "./index.css";
 import type { Image } from "wasp/entities";
 // import { getTasks, useQuery } from "wasp/client/operations";
 import { ChangeEvent, FormEvent } from "react";
