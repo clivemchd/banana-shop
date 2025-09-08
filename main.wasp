@@ -32,11 +32,11 @@ page DashboardPage {
 }
 
 query generateTextToImage {
-	fn: import { generateTextToImage } from "@src/server/test"
+	fn: import { generateTextToImage } from "@src/server/fal-test"
 }
 
 query generateImageToImage {
-	fn: import { generateImageToImage } from "@src/server/test"
+	fn: import { generateImageToImage } from "@src/server/fal-test"
 }
 
 // query getTasks {
