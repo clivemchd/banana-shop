@@ -22,7 +22,7 @@ app MicroBanana {
 					clientRoute: PasswordResetRoute,
 					getEmailContentFn: import { getPasswordResetEmailContent } from "@src/server/auth/email",
 				},
-				userSignupFields: import { getEmailUserFields } from "@src/auth/userSignupFields",
+				userSignupFields: import { getEmailUserFields } from "@src/client/pages/auth/userSignupFields",
 			},
 			google: {
 				configFn: import { getConfig } from "@src/server/auth/google",
