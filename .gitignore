@@ -11,3 +11,4 @@ node_modules/
 !.env.*.example
 banana-shop-470810-a4d04f8e0b63.json
 _banana-shop-470810-a4d04f8e0b63.json
+app/

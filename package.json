@@ -22,6 +22,7 @@
     "build": "bash ./bash/prod.sh",
     "deploy": "bash ./bash/deploy.sh",
     "db:start": "bash ./bash/db-start.sh",
+    "db:stop": "bash ./bash/db-stop.sh",
     "dev:dbm": "bash ./bash/db-migrate-dev.sh",
     "db:preview": "wasp db studio"
   },
