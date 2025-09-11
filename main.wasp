@@ -2,7 +2,7 @@ app MicroBanana {
 	wasp: {
 		version: "^0.17.1"
 	},
-	title: "Micro Banana",
+	title: "BananaShop",
 	head: [
 		"<link rel='icon' href='/favicon.ico' />",
 	],
@@ -11,25 +11,33 @@ app MicroBanana {
 		methods: {
 			email: {
 				fromField: {
-					name: "Micro Banana",
+					name: "BananaShop",
 					email: "noreply@microbanana.com"
 				},
 				emailVerification: {
-					clientRoute: EmailVerificationRoute
+					clientRoute: EmailVerificationRoute,
+					getEmailContentFn: import { getVerificationEmailContent } from "@src/server/auth/email",
 				},
 				passwordReset: {
-					clientRoute: PasswordResetRoute
-				}
+					clientRoute: PasswordResetRoute,
+					getEmailContentFn: import { getPasswordResetEmailContent } from "@src/server/auth/email",
+				},
+				userSignupFields: import { getEmailUserFields } from "@src/auth/userSignupFields",
 			},
 			google: {
 				configFn: import { getConfig } from "@src/server/auth/google",
 				userSignupFields: import { userSignupFields } from "@src/server/auth/google"
 			}
 		},
-		onAuthFailedRedirectTo: "/signin"
+		onAuthFailedRedirectTo: "/signin",
+		onAuthSucceededRedirectTo: "/"
 	},
 	emailSender: {
-		provider: Dummy
+		provider: Dummy,
+		defaultFrom: {
+			name: "BananaShop",
+			email: "me@example.com"
+    	},
 	}
 }
 

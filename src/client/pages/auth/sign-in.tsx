@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { login } from "wasp/client/auth";
 import { useState } from "react";
 import { cn } from "../../../lib/utils";
+import { Environment } from "../../utils/environment";
 import { Button } from "../../components/ui/button";
 import {
   Card,
@@ -57,8 +58,16 @@ export const SignInPage = () => {
       navigate("/");
     } catch (error: any) {
       // Secure error handling - don't expose sensitive information
-      // Use generic message to prevent user enumeration attacks
-      setError("Invalid email or password");
+      if (error.message?.includes("email not verified") || error.message?.includes("not verified")) {
+        setError("Please verify your email address before signing in. Check your email for a verification link.");
+        if (Environment.isDevelopment) {
+          console.log("🔔 Email verification required for:", email);
+          console.log("📧 In development mode - check your terminal for verification email");
+        }
+      } else {
+        // Use generic message to prevent user enumeration attacks
+        setError("Invalid email or password");
+      }
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,7 @@
 import "../../../index.css";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { resetPassword } from "wasp/client/auth";
 import { cn } from "../../../lib/utils";
 import {
   Card,
@@ -26,14 +27,13 @@ export const PasswordResetPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | Error | null>(null);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    setMessage(null);
 
     // Password validation following Wasp security protocols
     
@@ -66,13 +66,15 @@ export const PasswordResetPage = () => {
     }
 
     try {
-      // Simulate API call - this will be replaced with actual Wasp auth call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setMessage("Password reset successful! You can now sign in with your new password.");
-      setPassword("");
-      setConfirmPassword("");
+      // The token is passed as a query parameter
+      const token = new URLSearchParams(window.location.search).get('token');
+      if (!token) throw new Error('Token not found in URL');
+      
+      await resetPassword({ token, password });
+      navigate('/signin');
     } catch (error: any) {
-      setError("Failed to reset password. Please try again.");
+      console.error('Error during password reset:', error);
+      setError(error);
     } finally {
       setIsLoading(false);
     }
@@ -92,13 +94,7 @@ export const PasswordResetPage = () => {
             <form onSubmit={handleSubmit} className="grid gap-4">
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
-                  {error}
-                </div>
-              )}
-              
-              {message && (
-                <div className="p-3 text-sm text-green-600 bg-green-50 rounded-md">
-                  {message}
+                  {typeof error === 'string' ? error : error.message || 'An error occurred'}
                 </div>
               )}
 

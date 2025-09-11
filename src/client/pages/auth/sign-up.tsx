@@ -1,8 +1,9 @@
 import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
-import { signup, login } from "wasp/client/auth";
+import { signup } from "wasp/client/auth";
 import { useState } from "react";
 import { cn } from "../../../lib/utils";
+import { Environment } from "../../utils/environment";
 import { Button } from "../../components/ui/button";
 import {
   Card,
@@ -30,6 +31,7 @@ export const SignUpPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [signupComplete, setSignupComplete] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -74,12 +76,19 @@ export const SignUpPage = () => {
     }
 
     try {
-      // For email auth, we still use username field but pass the email
-      // This follows Wasp's internal structure for email authentication
-      await signup({ username: email, password });
-      // Auto-login after successful signup
-      await login({ email, password });
-      navigate("/");
+      // Wasp's email auth requires both email and username fields
+      // We use email for both to keep it simple for users
+      await signup({ 
+        email: email,
+        username: email, // Use email as username (transparent to user)
+        password: password 
+      });      // Don't auto-login - require email verification
+      setSignupComplete(true);
+      
+      if (Environment.isDevelopment) {
+        console.log("🔔 Email verification required for:", email);
+        console.log("📧 In development mode - check your terminal for verification email");
+      }
     } catch (error: any) {
       // Secure error handling - don't expose sensitive information
       if (error.message?.includes("already exists") || error.message?.includes("duplicate")) {
@@ -114,20 +123,35 @@ export const SignUpPage = () => {
                     </div>
                   )}
 
-                  {/* Email Field */}
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      autoComplete="email"
-                      disabled={isLoading}
-                    />
-                  </div>
+                  {/* Success Message */}
+                  {signupComplete && (
+                    <div className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-md p-3">
+                      <div className="font-medium mb-2">Account created successfully! 🎉</div>
+                      <div>Please check your email for a verification link before signing in.</div>
+                      {Environment.isDevelopment && (
+                        <div className="mt-2 text-xs text-green-700">
+                          Development mode: Check your terminal for the verification email.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!signupComplete && (
+                    <>
+                      {/* Email Field */}
+                      <div className="grid gap-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          autoComplete="email"
+                          disabled={isLoading}
+                        />
+                      </div>
 
                   {/* Password Field */}
                   <div className="grid gap-2">
@@ -208,10 +232,20 @@ export const SignUpPage = () => {
                     </div>
                   </div>
 
-                  {/* Sign Up Button */}
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Creating account..." : "Create account"}
-                  </Button>
+                      {/* Sign Up Button */}
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? "Creating account..." : "Create account"}
+                      </Button>
+                    </>
+                  )}
+
+                  {signupComplete && (
+                    <div className="text-center">
+                      <Button onClick={() => navigate("/signin")} className="w-full">
+                        Go to Sign In
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </form>
 

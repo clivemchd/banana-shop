@@ -1,6 +1,7 @@
 import "../../../index.css";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { requestPasswordReset } from "wasp/client/auth";
 import { cn } from "../../../lib/utils";
 import { Environment } from "../../utils/environment";
 import {
@@ -17,10 +18,10 @@ import { Label } from "../../components/ui/label";
 export const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [error, setError] = useState<string | Error | null>(null);
 
-    const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     setIsLoading(true);
@@ -34,25 +35,54 @@ export const ForgotPasswordPage = () => {
     }
 
     try {
-      // Note: This is a placeholder for when Wasp's requestPasswordReset is configured
-      // For now, we'll simulate the behavior in development
-      if (Environment.isDevelopment) {
-        console.log("Password reset requested for:", email);
-        console.log("In development mode - password reset email would be sent to:", email);
-        setMessage("Development mode: Check the console for the password reset link. In production, an email would be sent.");
-      } else {
-        // In production, this would call the actual Wasp password reset function
-        console.log("Password reset requested for:", email);
-        setMessage("If an account with this email exists, you will receive a password reset link.");
-      }
+      await requestPasswordReset({ email });
+      setNeedsConfirmation(true);
       setEmail("");
+      
+      if (Environment.isDevelopment) {
+        console.log("🔔 Password reset requested for:", email);
+        console.log("📧 In development mode - check your terminal for the reset email");
+      }
     } catch (error: any) {
-      // Use generic message for security - don't confirm if email exists
-      setError("Unable to process password reset request. Please try again.");
+      console.error('Error during requesting reset:', error);
+      setError(error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // If password reset was requested successfully, show confirmation message
+  if (needsConfirmation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <Card className="mx-auto max-w-sm">
+            <CardHeader>
+              <CardTitle className="text-2xl">Check Your Email</CardTitle>
+              <CardDescription>
+                Check your email for the confirmation link. If you don't see it, check spam/junk folder.
+                {Environment.isDevelopment && (
+                  <div className="mt-2 p-2 bg-blue-50 text-blue-700 text-xs rounded">
+                    Development mode: Check your terminal for the password reset link.
+                  </div>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center">
+                <Link 
+                  to="/signin" 
+                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                >
+                  Back to login
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -66,15 +96,9 @@ export const ForgotPasswordPage = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid gap-4">
-              {message && (
-                <div className="p-3 text-sm text-blue-600 bg-blue-50 rounded-md">
-                  {message}
-                </div>
-              )}
-
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
-                  {error}
+                  {typeof error === 'string' ? error : error.message || 'An error occurred'}
                 </div>
               )}
 
