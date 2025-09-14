@@ -20,6 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../../components/ui/tooltip";
+import Navbar from "../landing/navbar";
 
 export const PasswordResetPage = () => {
   const [password, setPassword] = useState("");
@@ -81,8 +82,10 @@ export const PasswordResetPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <div className="flex-1 flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
         <Card className="mx-auto max-w-sm">
           <CardHeader>
             <CardTitle className="text-2xl">Reset Password</CardTitle>
@@ -191,6 +194,7 @@ export const PasswordResetPage = () => {
             </form>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );
