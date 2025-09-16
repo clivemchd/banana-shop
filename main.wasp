@@ -1,18 +1,18 @@
-app MicroBanana {
+app NanoStudio {
 	wasp: {
 		version: "^0.17.1"
 	},
-	title: "BananaShop",
+	title: "Nano Studio",
 	head: [
-		"<link rel='icon' href='/favicon.ico' />",
+		"<link rel='icon' type='image/svg+xml' href='/logo.svg' />",
 	],
 	auth: {
 		userEntity: Users,
 		methods: {
 			email: {
 				fromField: {
-					name: "BananaShop",
-					email: "noreply@microbanana.com"
+					name: "NanoStudio",
+					email: "noreply@nanostudio.com"
 				},
 				emailVerification: {
 					clientRoute: EmailVerificationRoute,
@@ -35,7 +35,7 @@ app MicroBanana {
 	emailSender: {
 		provider: Dummy,
 		defaultFrom: {
-			name: "BananaShop",
+			name: "Nano Studio",
 			email: "me@example.com"
     	},
 	}
