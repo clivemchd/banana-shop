@@ -180,18 +180,17 @@ const Footer = () => {
           </div>
         ))} */}
       </div>
-      <Separator />
-      <div className="max-w-screen-xl mx-auto py-8 flex flex-col-reverse sm:flex-row items-center justify-between gap-x-2 gap-y-5 px-6">
-        {/* Copyright */}
+      {/* <Separator /> */}
+      {/* <div className="max-w-screen-xl mx-auto py-8 flex flex-col-reverse sm:flex-row items-center justify-between gap-x-2 gap-y-5 px-6">
         <span className="text-muted-foreground text-center xs:text-start">
           &copy; {new Date().getFullYear()}{" "}
           <a href="#" target="_blank">
-            Bananashop
+            NanoStudio
           </a>
           . All rights reserved.
         </span>
 
-        {/* <div className="flex items-center gap-5 text-muted-foreground">
+        <div className="flex items-center gap-5 text-muted-foreground">
           <a href="#" target="_blank">
             <Twitter className="h-5 w-5" />
           </a>
@@ -204,8 +203,8 @@ const Footer = () => {
           <a href="#" target="_blank">
             <Github className="h-5 w-5" />
           </a>
-        </div> */}
-      </div>
+        </div>
+      </div> */}
     </footer>
   );
 };

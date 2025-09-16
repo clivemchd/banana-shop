@@ -32,7 +32,7 @@ const Hero = () => {
         <div className="relative lg:max-w-lg xl:max-w-xl w-full bg-accent rounded-xl aspect-square overflow-hidden">
           <VideoPlayer 
             settings={{
-              src: "/public/assets/videos/short-cap-full-tut-music.mp4",
+              src: "/assets/videos/short-cap-full-tut-music.mp4",
               startTime: 13,
               endTime: 17,
               loop: true,
