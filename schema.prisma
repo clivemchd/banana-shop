@@ -20,5 +20,11 @@ model Users {
 	images Image[]
 	isAdmin  Boolean @default(false)
 	email String @unique
+	name String? 
 	username String? @unique
+  	paymentProcessorUserId String? @unique
+	subscriptionStatus String?
+	subscriptionPlan String?
+	datePaid DateTime?
+	credits Int @default(0)
 }
