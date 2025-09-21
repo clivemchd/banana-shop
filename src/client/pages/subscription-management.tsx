@@ -11,6 +11,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { CreditCard, Calendar, Crown, Settings, ExternalLink, Check, X } from 'lucide-react';
 import { useState } from 'react';
 import Navbar from './landing/navbar';
+import { 
+    getUnifiedPlans, 
+    calculatePlanPricing, 
+    calculateAnnualSavings, 
+    getMaxAnnualSavingsPercent,
+    formatPrice,
+    type BillingCycle,
+    type PlanPricing 
+} from '../utils/pricing-calculations';
 
 // Temporary type until operation is generated
 type UserSubscriptionInfo = {
@@ -25,7 +34,7 @@ type UserSubscriptionInfo = {
 const SubscriptionManagementPage = () => {
     const { data: user } = useAuth();
     const navigate = useNavigate();
-    const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+    const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
     const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -83,16 +92,11 @@ const SubscriptionManagementPage = () => {
     const isLaunchActive = launchSettings?.isLaunchOfferActive || false;
     const discountPercent = launchSettings?.discountPercent || 0;
 
-    // Calculate maximum annual savings for the badge
-    const maxAnnualSavings = Math.max(
-        ...getSubscriptionPaymentPlanIds().map(planId => {
-            const plan = paymentPlans[planId];
-            if (plan.annualPrice) {
-                return Math.round(((plan.price * 12 - plan.annualPrice) / (plan.price * 12)) * 100);
-            }
-            return 0;
-        })
-    );
+    // Calculate maximum annual savings for the badge using shared utility
+    const maxAnnualSavings = getMaxAnnualSavingsPercent();
+    
+    // Get unified plans
+    const unifiedPlans = getUnifiedPlans();
 
     // Debug: log user data to console to help troubleshoot subscription status
     console.log('🔍 Debug - Subscription data:', {
@@ -310,12 +314,11 @@ const SubscriptionManagementPage = () => {
                         {/* Plan Headers */}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                             <div></div> {/* Empty cell for feature column */}
-                            {getSubscriptionPaymentPlanIds().map((planId) => {
-                                const plan = paymentPlans[planId];
-                                const isCurrentPlan = subscription?.subscriptionPlan === planId;
+                            {unifiedPlans.map((plan) => {
+                                const isCurrentPlan = subscription?.subscriptionPlan === plan.planId;
 
                                 return (
-                                    <Card key={planId} className={`text-center relative ${isCurrentPlan ? 'border-primary ring-1 ring-primary' : ''}`}>
+                                    <Card key={plan.planId} className={`text-center relative ${isCurrentPlan ? 'border-primary ring-1 ring-primary' : ''}`}>
                                         <CardHeader className="pb-2">
                                             {isCurrentPlan && (
                                                 <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2" variant="default">
@@ -330,32 +333,25 @@ const SubscriptionManagementPage = () => {
                                             <CardTitle className="text-xl">{plan.name}</CardTitle>
                                             <div className="space-y-1">
                                                 {(() => {
-                                                    const currentPrice = billingCycle === 'annual' && plan.annualPrice 
-                                                        ? Math.round(plan.annualPrice / 12) // Convert annual to monthly display
-                                                        : plan.price;
-                                                    const displayPrice = isLaunchActive 
-                                                        ? Math.round(currentPrice * (1 - discountPercent / 100))
-                                                        : currentPrice;
+                                                    const pricing = calculatePlanPricing(plan, billingCycle, isLaunchActive, discountPercent);
+                                                    const annualSavings = calculateAnnualSavings(plan, isLaunchActive, discountPercent);
                                                     
                                                     return (
                                                         <>
-                                                            {isLaunchActive ? (
+                                                            {pricing.isDiscounted ? (
                                                                 <div className="flex items-center justify-center gap-2">
-                                                                    <p className="text-2xl font-bold">${displayPrice}</p>
-                                                                    <p className="text-lg text-muted-foreground line-through">${currentPrice}</p>
+                                                                    <p className="text-2xl font-bold">${formatPrice(pricing.displayPrice)}</p>
+                                                                    <p className="text-lg text-muted-foreground line-through">${formatPrice(pricing.originalPrice)}</p>
                                                                 </div>
                                                             ) : (
-                                                                <p className="text-3xl font-bold">${displayPrice}</p>
+                                                                <p className="text-3xl font-bold">${formatPrice(pricing.displayPrice)}</p>
                                                             )}
                                                             <p className="text-sm text-muted-foreground">
                                                                 per month{billingCycle === 'annual' ? ' (billed annually)' : ''}
                                                             </p>
-                                                            {billingCycle === 'annual' && plan.annualPrice && (
+                                                            {billingCycle === 'annual' && annualSavings && annualSavings > 0 && (
                                                                 <div className="text-xs text-green-600">
-                                                                    {isLaunchActive 
-                                                                        ? `Save $${(Math.round(plan.price * (1 - discountPercent / 100)) * 12) - Math.round(plan.annualPrice * (1 - discountPercent / 100))} vs monthly`
-                                                                        : `Save $${(plan.price * 12) - plan.annualPrice} vs monthly`
-                                                                    }
+                                                                    Save ${formatPrice(annualSavings)} vs monthly
                                                                 </div>
                                                             )}
                                                             {isLaunchActive && (
@@ -375,7 +371,7 @@ const SubscriptionManagementPage = () => {
                                                 </Button>
                                             ) : (
                                                 <Button
-                                                    onClick={() => handleSubscribeClick(planId)}
+                                                    onClick={() => handleSubscribeClick(plan.planId)}
                                                     disabled={isPaymentLoading}
                                                     variant={plan.isPopular ? "default" : "outline"}
                                                     className="w-full"
@@ -437,10 +433,9 @@ const SubscriptionManagementPage = () => {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="font-semibold">Features</TableHead>
-                                        {getSubscriptionPaymentPlanIds().map((planId) => {
-                                            const plan = paymentPlans[planId];
+                                        {unifiedPlans.map((plan) => {
                                             return (
-                                                <TableHead key={planId} className="text-center font-semibold">
+                                                <TableHead key={plan.planId} className="text-center font-semibold">
                                                     {plan.name}
                                                     <div className="text-xs font-normal text-muted-foreground mt-1">
                                                         {billingCycle === 'annual' ? 'Billed Annually' : 'Billed Monthly'}

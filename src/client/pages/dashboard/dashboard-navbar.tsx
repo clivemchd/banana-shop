@@ -202,7 +202,7 @@ const DashboardNavbar = () => {
     return (
       <nav className="h-16 bg-background border-b border-accent">
         <div className="h-full flex items-center justify-between max-w-screen-xl mx-auto px-4 sm:px-6">
-          <Link to="/dashboard" className="hover:opacity-80 transition-opacity">
+          <Link to="/" className="hover:opacity-80 transition-opacity">
             <Logo />
           </Link>
           <div className="animate-pulse">
@@ -219,7 +219,7 @@ const DashboardNavbar = () => {
   return (
     <nav className="h-16 bg-background border-b border-accent">
       <div className="h-full flex items-center justify-between max-w-screen-xl mx-auto px-4 sm:px-6">
-        <Link to="/dashboard" className="hover:opacity-80 transition-opacity">
+        <Link to="/" className="hover:opacity-80 transition-opacity">
           <Logo />
         </Link>
 

@@ -10,61 +10,22 @@ import { generateCheckoutSession } from 'wasp/client/operations';
 import { useAuth } from 'wasp/client/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import { PaymentPlanId, paymentPlans } from '../../../payment/plans';
-
-const plans = [
-	{
-		name: 'Starter',
-		price: 9,
-		annualPrice: 86, // $9 * 12 * 0.8 = 86.4, rounded
-		frequency: '/month',
-		credits: '40 Credits',
-		description: 'Perfect for getting started and occasional use.',
-		features: [
-			'80 image generations',
-			'40 image edits per month',
-			'Standard processing speed',
-			'Community support',
-		],
-		cta: 'Get Started',
-		planId: PaymentPlanId.Starter,
-	},
-	{
-		name: 'Pro',
-		price: 19,
-		annualPrice: 182, // $19 * 12 * 0.8 = 182.4, rounded
-		frequency: '/month',
-		credits: '180 Credits',
-		description: 'For hobbyists and regular users.',
-		features: [
-			'360 image genrations',
-			'180 image edits per month',
-			'Faster processing',
-			'Email support',
-		],
-		cta: 'Choose Pro',
-		featured: true,
-		planId: PaymentPlanId.Pro,
-	},
-	{
-		name: 'Business',
-		price: 89,
-		annualPrice: 854, // $89 * 12 * 0.8 = 854.4, rounded
-		frequency: '/month',
-		credits: '1,000 Credits',
-		description: 'For power users and small businesses.',
-		features: [
-			'2,000 image genrations',
-			'1,000 image edits per month',
-			'Highest priority processing',
-			'Dedicated support',
-		],
-		cta: 'Get Started',
-		planId: PaymentPlanId.Business,
-	},
-];
+import { 
+	getUnifiedPlans, 
+	calculatePlanPricing, 
+	calculateAnnualSavings, 
+	getAnnualPrice, 
+	formatPrice, 
+	normalizeBillingCycle,
+	type BillingCycle,
+	type PlanPricing 
+} from '../../utils/pricing-calculations';
 
 const Pricing = () => {
-	const [billingCycle, setBillingCycle] = useState('monthly');
+	const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+	
+	// Get unified plans from the shared utility
+	const plans = getUnifiedPlans();
 	const [isPaymentLoading, setIsPaymentLoading] = useState<string | null>(null);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	
@@ -87,9 +48,9 @@ const Pricing = () => {
 		: null;
 
 	// Helper function to get button text and style for each plan
-	const getButtonConfig = (plan: typeof plans[0]) => {
+	const getButtonConfig = (plan: PlanPricing) => {
 		if (!currentSubscription?.isSubscribed) {
-			return { text: plan.cta, style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
+			return { text: plan.cta || 'Get Started', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
 		}
 
 		if (currentSubscription.subscriptionPlan === plan.planId) {
@@ -107,7 +68,7 @@ const Pricing = () => {
 			}
 		}
 
-		return { text: plan.cta, style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
+		return { text: plan.cta || 'Get Started', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
 	};
 
 	const handleGetStarted = async (planId: PaymentPlanId) => {
@@ -122,10 +83,9 @@ const Pricing = () => {
 			setErrorMessage(null);
 			
 			// Generate checkout session with billing cycle
-			const normalizedBillingCycle = billingCycle === 'annually' ? 'annual' : 'monthly';
 			const { sessionUrl } = await generateCheckoutSession({
 				paymentPlanId: planId,
-				billingCycle: normalizedBillingCycle
+				billingCycle: billingCycle
 			} as any);
 			
 			if (sessionUrl) {
@@ -186,9 +146,9 @@ const Pricing = () => {
 					<Label htmlFor='billing-cycle'>Monthly</Label>
 					<Switch
 						id='billing-cycle'
-						checked={billingCycle === 'annually'}
+						checked={billingCycle === 'annual'}
 						onCheckedChange={(checked: boolean) =>
-							setBillingCycle(checked ? 'annually' : 'monthly')
+							setBillingCycle(checked ? 'annual' : 'monthly')
 						}
 					/>
 					<Label htmlFor='billing-cycle'>Annually</Label>
@@ -226,61 +186,61 @@ const Pricing = () => {
 								{plan.description}
 							</p>
 							<div className='mt-4'>
-								{showLaunchOffer ? (
-									<>
-										{/* Launch Offer Pricing */}
-										<div className='flex items-baseline gap-2 mb-2'>
-											<span className='text-4xl font-bold'>
-												${' '}
-												{billingCycle === 'annually'
-													? calculateLaunchPrice(Math.round(plan.annualPrice / 12))
-													: calculateLaunchPrice(plan.price)}
-											</span>
-											<span className='text-gray-500'>
-												{plan.frequency}
-											</span>
-										</div>
-										
-										{/* Original Price Crossed Out */}
-										<div className='flex items-center gap-2 mb-1'>
-											<span className='text-lg text-gray-400 line-through'>
-												${billingCycle === 'annually'
-													? (plan.annualPrice / 12).toFixed(2)
-													: plan.price}
-											</span>
-											<span className='text-sm font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full'>
-												Save ${billingCycle === 'annually'
-													? calculateSavings(Math.round(plan.annualPrice / 12))
-													: calculateSavings(plan.price)}/mo
-											</span>
-										</div>
-									</>
-								) : (
-									<>
-										{/* Normal Pricing */}
-										<div className='flex items-baseline gap-2 mb-2'>
-											<span className='text-4xl font-bold'>
-												${' '}
-												{billingCycle === 'annually'
-													? (plan.annualPrice / 12).toFixed(2)
-													: plan.price}
-											</span>
-											<span className='text-gray-500'>
-												{plan.frequency}
-											</span>
-										</div>
-									</>
-								)}
+								{(() => {
+									const pricing = calculatePlanPricing(plan, billingCycle, showLaunchOffer, 30);
+									const annualTotal = getAnnualPrice(plan, showLaunchOffer, 30);
+									
+									return (
+										<>
+											{pricing.isDiscounted ? (
+												<>
+													{/* Launch Offer Pricing */}
+													<div className='flex items-baseline gap-2 mb-2'>
+														<span className='text-4xl font-bold'>
+															${formatPrice(pricing.displayPrice)}
+														</span>
+														<span className='text-gray-500'>
+															{plan.frequency}
+														</span>
+													</div>
+													
+													{/* Original Price Crossed Out */}
+													<div className='flex items-center gap-2 mb-1'>
+														<span className='text-lg text-gray-400 line-through'>
+															${formatPrice(pricing.originalPrice)}
+														</span>
+														<span className='text-sm font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full'>
+															Save ${formatPrice(pricing.savings || 0)}/mo
+														</span>
+													</div>
+												</>
+											) : (
+												<>
+													{/* Normal Pricing */}
+													<div className='flex items-baseline gap-2 mb-2'>
+														<span className='text-4xl font-bold'>
+															${formatPrice(pricing.displayPrice)}
+														</span>
+														<span className='text-gray-500'>
+															{plan.frequency}
+														</span>
+													</div>
+												</>
+											)}
+											
+											{billingCycle === 'annual' && annualTotal && (
+												<p className='text-xs text-gray-500 mt-1'>
+													{showLaunchOffer ? (
+														<>Launch price: ${annualTotal} per year (normally ${plan.annualPrice})</>
+													) : (
+														<>Billed as ${plan.annualPrice} per year</>
+													)}
+												</p>
+											)}
+										</>
+									);
+								})()}
 							</div>
-							{billingCycle === 'annually' && (
-								<p className='text-xs text-gray-500 mt-1'>
-									{showLaunchOffer ? (
-										<>Launch price: ${calculateLaunchPrice(plan.annualPrice)} per year (normally ${plan.annualPrice})</>
-									) : (
-										<>Billed as ${plan.annualPrice} per year</>
-									)}
-								</p>
-							)}
 							<p className='mt-4 font-semibold text-primary'>
 								{plan.credits}
 							</p>
