@@ -77,6 +77,16 @@ page DashboardPage {
 	component: import { DashboardPage } from "@src/client/pages/dashboard/dashboard"
 }
 
+route PricingPageRoute { path: "/pricing", to: PricingPage }
+page PricingPage {
+	component: import { PricingPage } from "@src/payment/pricing-page"
+}
+
+route CheckoutPageRoute { path: "/checkout", to: CheckoutPage }
+page CheckoutPage {
+	component: import CheckoutPage from "@src/payment/checkout-page"
+}
+
 query generateTextToImage {
 	fn: import { generateTextToImage } from "@src/server/fal-test"
 }
@@ -85,17 +95,24 @@ query generateImageToImage {
 	fn: import { generateImageToImage } from "@src/server/fal-test"
 }
 
-// query getTasks {
-// 	fn: import { getTasks } from "@src/tasks-server",
-// 	entities: [Image]
-// }
+// Payment operations
+action generateCheckoutSession {
+	fn: import { generateCheckoutSession } from "@src/payment/operations",
+	entities: [Users]
+}
 
-// action createTask {
-// 	fn: import { createTask } from "@src/tasks-server",
-// 	entities: [Image]
-// }
+query getCustomerPortalUrl {
+	fn: import { getCustomerPortalUrl } from "@src/payment/operations",
+	entities: [Users]
+}
 
-// action updateTask {
-// 	fn: import { updateTask } from "@src/tasks-server",
-// 	entities: [Image] 
-// }
+query getLaunchSettings {
+	fn: import { getLaunchSettings } from "@src/server/launch-settings"
+}
+
+// Stripe webhook
+api paymentsWebhook {
+	fn: import { stripeWebhook } from "@src/payment/stripe/webhook",
+	entities: [Users],
+	httpRoute: (POST, "/payments-webhook")
+}

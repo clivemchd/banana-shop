@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { cn } from '../../utils/cn';
-import { CircleCheck } from 'lucide-react';
+import { CircleCheck, Sparkles } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
 import { Label } from '../../components/ui/label';
+import { isLaunchOfferActive, calculateLaunchPrice, calculateSavings } from '../../utils/launch-config';
 
 const plans = [
 	{
@@ -15,10 +16,10 @@ const plans = [
 		credits: '40 Credits',
 		description: 'Perfect for getting started and occasional use.',
 		features: [
+			'80 image generations',
 			'40 image edits per month',
 			'Standard processing speed',
 			'Community support',
-			'Overages: $0.20/credit',
 		],
 		cta: 'Get Started',
 	},
@@ -30,10 +31,10 @@ const plans = [
 		credits: '180 Credits',
 		description: 'For hobbyists and regular users.',
 		features: [
+			'360 image genrations',
 			'180 image edits per month',
 			'Faster processing',
 			'Email support',
-			'Overages: $0.15/credit',
 		],
 		cta: 'Choose Pro',
 		featured: true,
@@ -46,22 +47,36 @@ const plans = [
 		credits: '1,000 Credits',
 		description: 'For power users and small businesses.',
 		features: [
+			'2,000 image genrations',
 			'1,000 image edits per month',
 			'Highest priority processing',
 			'Dedicated support',
-			'Overages: $0.12/credit',
 		],
-		cta: 'Contact Us',
+		cta: 'Get Started',
 	},
 ];
 
 const Pricing = () => {
 	const [billingCycle, setBillingCycle] = useState('monthly');
+	
+	// Check if launch offer is active from configuration
+	const showLaunchOffer = isLaunchOfferActive();
 
 	return (
 		<section id='pricing' className='py-20'>
 			<div className='container mx-auto px-4'>
 				<h2 className='text-3xl font-bold text-center mb-4'>Pricing</h2>
+				
+				{/* Launch Offer Banner - Only show if launch is active */}
+				{showLaunchOffer && (
+					<div className='text-center mb-8'>
+						<div className='inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-full font-semibold'>
+							<Sparkles className='h-5 w-5' />
+							<span>Launch Offer: Use code LAUNCH30 for 30% off first 3 months!</span>
+						</div>
+					</div>
+				)}
+				
 				<div className='flex items-center justify-center space-x-2 mb-12'>
 					<Label htmlFor='billing-cycle'>Monthly</Label>
 					<Switch
@@ -91,24 +106,74 @@ const Pricing = () => {
 									Most Popular
 								</Badge>
 							)}
-							<h3 className='text-2xl font-semibold'>{plan.name}</h3>
+							
+							{/* 30% OFF Badge - Above the name with proper spacing */}
+							{showLaunchOffer && (
+								<div className='mb-3'>
+									<Badge className='bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold'>
+										30% OFF
+									</Badge>
+								</div>
+							)}
+							
+							<h3 className='text-2xl font-semibold mb-4'>{plan.name}</h3>
 							<p className='mt-2 text-gray-600 h-12'>
 								{plan.description}
 							</p>
 							<div className='mt-4'>
-								<span className='text-4xl font-bold'>
-									${' '}
-									{billingCycle === 'annually'
-										? (plan.annualPrice / 12).toFixed(2)
-										: plan.price}
-								</span>
-								<span className='text-gray-500'>
-									{plan.frequency}
-								</span>
+								{showLaunchOffer ? (
+									<>
+										{/* Launch Offer Pricing */}
+										<div className='flex items-baseline gap-2 mb-2'>
+											<span className='text-4xl font-bold'>
+												${' '}
+												{billingCycle === 'annually'
+													? calculateLaunchPrice(Math.round(plan.annualPrice / 12))
+													: calculateLaunchPrice(plan.price)}
+											</span>
+											<span className='text-gray-500'>
+												{plan.frequency}
+											</span>
+										</div>
+										
+										{/* Original Price Crossed Out */}
+										<div className='flex items-center gap-2 mb-1'>
+											<span className='text-lg text-gray-400 line-through'>
+												${billingCycle === 'annually'
+													? (plan.annualPrice / 12).toFixed(2)
+													: plan.price}
+											</span>
+											<span className='text-sm font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full'>
+												Save ${billingCycle === 'annually'
+													? calculateSavings(Math.round(plan.annualPrice / 12))
+													: calculateSavings(plan.price)}/mo
+											</span>
+										</div>
+									</>
+								) : (
+									<>
+										{/* Normal Pricing */}
+										<div className='flex items-baseline gap-2 mb-2'>
+											<span className='text-4xl font-bold'>
+												${' '}
+												{billingCycle === 'annually'
+													? (plan.annualPrice / 12).toFixed(2)
+													: plan.price}
+											</span>
+											<span className='text-gray-500'>
+												{plan.frequency}
+											</span>
+										</div>
+									</>
+								)}
 							</div>
 							{billingCycle === 'annually' && (
 								<p className='text-xs text-gray-500 mt-1'>
-									Billed as ${plan.annualPrice} per year
+									{showLaunchOffer ? (
+										<>Launch price: ${calculateLaunchPrice(plan.annualPrice)} per year (normally ${plan.annualPrice})</>
+									) : (
+										<>Billed as ${plan.annualPrice} per year</>
+									)}
 								</p>
 							)}
 							<p className='mt-4 font-semibold text-primary'>

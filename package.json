@@ -10,6 +10,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-switch": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@types/stripe": "^8.0.416",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "embla-carousel-react": "^8.6.0",
@@ -18,6 +19,7 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.57.0",
     "react-router-dom": "^6.26.2",
+    "stripe": "^18.5.0",
     "tailwind-merge": "~2.6.0",
     "wasp": "file:.wasp/out/sdk/wasp"
   },
