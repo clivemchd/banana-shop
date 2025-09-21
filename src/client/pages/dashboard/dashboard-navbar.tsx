@@ -62,12 +62,12 @@ const UserDropdown = ({ userEmail, profileImage }: { userEmail: string; profileI
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  // TODO: Navigate to billing page
+                  // TODO: Navigate to subscription page
                 }}
                 className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
               >
                 <CreditCard className="h-4 w-4" />
-                Billing
+                Subscription
               </button>
               
               <div className="border-t border-border my-1"></div>
@@ -166,11 +166,11 @@ const MobileMenu = ({ userEmail, profileImage }: { userEmail: string; profileIma
                 className="w-full justify-start gap-2"
                 onClick={() => {
                   setIsOpen(false);
-                  // TODO: Navigate to billing page
+                  // TODO: Navigate to subscription page
                 }}
               >
                 <CreditCard className="h-4 w-4" />
-                Billing
+                Subscription
               </Button>
             </div>
             
