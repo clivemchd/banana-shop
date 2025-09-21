@@ -133,3 +133,126 @@ export const getCurrentUserSubscription = async (_args: any, context: any) => {
     paymentProcessorUserId: user.paymentProcessorUserId,
   };
 };
+
+// Manual sync operation to fix subscription status
+export const syncUserSubscription = async (args: any, context: any) => {
+  if (!context.user) {
+    throw new HttpError(401, 'User not authenticated');
+  }
+
+  const user = await context.entities.Users.findUniqueOrThrow({
+    where: {
+      id: context.user.id,
+    },
+  });
+
+  if (!user.paymentProcessorUserId) {
+    throw new HttpError(400, 'User has no payment processor customer ID');
+  }
+
+  console.log('🔄 Syncing subscription for user:', user.email);
+  console.log('💳 Customer ID:', user.paymentProcessorUserId);
+
+  try {
+    // Import Stripe here to avoid circular dependencies
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    
+    // Fetch subscriptions from Stripe
+    const subscriptions = await stripe.subscriptions.list({
+      customer: user.paymentProcessorUserId,
+      status: 'all',
+      limit: 10
+    });
+
+    console.log('📋 Found subscriptions from Stripe:', subscriptions.data.length);
+    
+    if (subscriptions.data.length === 0) {
+      console.log('❌ No subscriptions found in Stripe for this customer');
+      return {
+        success: false,
+        message: 'No subscriptions found in Stripe',
+        stripeCustomerId: user.paymentProcessorUserId
+      };
+    }
+
+    // Find the most recent active subscription
+    const activeSubscription = subscriptions.data.find((sub: any) => sub.status === 'active');
+    const latestSubscription = subscriptions.data[0]; // Most recent
+    
+    console.log('🔍 Active subscription:', activeSubscription?.id || 'none');
+    console.log('🔍 Latest subscription:', latestSubscription?.id, 'status:', latestSubscription?.status);
+
+    // Use active subscription if available, otherwise use latest
+    const subscriptionToSync = activeSubscription || latestSubscription;
+
+    if (subscriptionToSync) {
+      // Extract plan from subscription
+      const priceId = subscriptionToSync.items?.data?.[0]?.price?.id;
+      console.log('💰 Price ID:', priceId);
+      
+      // Plan mapping based on price amounts and known price IDs
+      let planName: string | null = null;
+      const amount = subscriptionToSync.items?.data?.[0]?.price?.unit_amount;
+      
+      // Map based on price ID or amount
+      if (priceId === 'price_1S9a1BKPBVKSP3Z42CpnaDkv' || amount === 1900) {
+        planName = 'pro';  // $19.00 plan
+      } else if (priceId === 'price_1S9a02KPBVKSP3Z4slA5Lv0y' || amount === 900) {
+        planName = 'starter';  // $9.00 plan
+      } else if (amount === 2900) {
+        planName = 'business';  // $29.00 plan (if exists)
+      } else if (priceId && priceId.includes('pro')) {
+        planName = 'pro';
+      } else if (priceId && priceId.includes('starter')) {
+        planName = 'starter';
+      } else if (priceId && priceId.includes('business')) {
+        planName = 'business';
+      } else {
+        // Fallback: detect by amount
+        if (amount >= 1500) {
+          planName = 'pro';
+        } else if (amount >= 800) {
+          planName = 'starter';
+        }
+      }
+      
+      console.log('📦 Inferred plan:', planName);
+
+      // Update user in database
+      const updatedUser = await context.entities.Users.update({
+        where: { id: context.user.id },
+        data: {
+          subscriptionStatus: subscriptionToSync.status,
+          subscriptionPlan: planName as string | null,
+          datePaid: subscriptionToSync.status === 'active' ? new Date() : user.datePaid,
+        }
+      });
+
+      console.log('✅ User subscription synced successfully');
+      
+      return {
+        success: true,
+        message: 'Subscription synced successfully',
+        stripeSubscription: {
+          id: subscriptionToSync.id,
+          status: subscriptionToSync.status,
+          priceId: priceId
+        },
+        updatedData: {
+          subscriptionStatus: updatedUser.subscriptionStatus,
+          subscriptionPlan: updatedUser.subscriptionPlan,
+          datePaid: updatedUser.datePaid
+        }
+      };
+    } else {
+      return {
+        success: false,
+        message: 'No valid subscription found to sync'
+      };
+    }
+
+  } catch (error: any) {
+    console.error('❌ Error syncing subscription:', error);
+    throw new HttpError(500, `Failed to sync subscription: ${error.message}`);
+  }
+};

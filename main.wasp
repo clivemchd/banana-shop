@@ -116,6 +116,11 @@ query getCurrentUserSubscription {
 	entities: [Users]
 }
 
+action syncUserSubscription {
+	fn: import { syncUserSubscription } from "@src/payment/operations",
+	entities: [Users]
+}
+
 // Stripe webhook
 api paymentsWebhook {
 	fn: import { stripeWebhook } from "@src/payment/stripe/webhook",

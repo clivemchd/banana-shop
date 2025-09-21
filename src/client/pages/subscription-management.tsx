@@ -37,6 +37,8 @@ const SubscriptionManagementPage = () => {
     const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
     const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [syncMessage, setSyncMessage] = useState<string | null>(null);
+    const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
     const {
         data: customerPortalUrl,
@@ -170,6 +172,23 @@ const SubscriptionManagementPage = () => {
         }
     };
 
+    // Manual sync function (temporary debug feature)
+    const handleManualSync = async () => {
+        setIsSyncing(true);
+        setSyncMessage(null);
+        
+        try {
+            // For now, we'll just show debug info
+            // TODO: Implement actual sync when operation is available
+            setSyncMessage(`Debug info: User ID: ${user?.id}, Customer ID: ${subscription?.paymentProcessorUserId}`);
+            console.log('Current subscription data:', subscription);
+        } catch (error: any) {
+            setSyncMessage(`Error: ${error.message}`);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background">
             <Navbar showFeatures={false} showPricing={false} />
@@ -296,6 +315,35 @@ const SubscriptionManagementPage = () => {
                             <div className="text-xs text-muted-foreground">
                                 Opens Stripe Customer Portal in a new window to manage payment methods,
                                 invoices, and subscription settings.
+                            </div>
+
+                            {/* Debug Section - Remove in production */}
+                            <div className="mt-4 p-3 bg-muted rounded-md">
+                                <h4 className="text-sm font-medium mb-2">Debug Information</h4>
+                                <div className="text-xs space-y-1">
+                                    <p><strong>User ID:</strong> {user?.id}</p>
+                                    <p><strong>Email:</strong> {user?.email}</p>
+                                    <p><strong>Customer ID:</strong> {subscription?.paymentProcessorUserId || 'None'}</p>
+                                    <p><strong>Subscription Status:</strong> {subscription?.subscriptionStatus || 'None'}</p>
+                                    <p><strong>Subscription Plan:</strong> {subscription?.subscriptionPlan || 'None'}</p>
+                                    <p><strong>Date Paid:</strong> {subscription?.datePaid ? new Date(subscription.datePaid).toLocaleDateString() : 'None'}</p>
+                                </div>
+                                
+                                <Button
+                                    onClick={handleManualSync}
+                                    disabled={isSyncing}
+                                    className="w-full mt-2"
+                                    variant="secondary"
+                                    size="sm"
+                                >
+                                    {isSyncing ? 'Checking...' : 'Refresh Subscription Data'}
+                                </Button>
+                                
+                                {syncMessage && (
+                                    <div className="mt-2 p-2 bg-background rounded text-xs">
+                                        {syncMessage}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

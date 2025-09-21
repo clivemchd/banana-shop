@@ -1,6 +1,7 @@
 import { stripe, getStripeWebhookSecret } from './stripe-client';
 import type { MiddlewareConfigFn } from 'wasp/server';
 import { HttpError } from 'wasp/server';
+import express from 'express';
 
 export const stripeWebhook = async (request: any, response: any, context: any) => {
   const body = request.body;
@@ -8,7 +9,7 @@ export const stripeWebhook = async (request: any, response: any, context: any) =
 
   if (!signature) {
     console.error('No Stripe signature found in headers');
-    throw new HttpError(400, 'No Stripe signature found');
+    return response.status(400).send('No Stripe signature found');
   }
 
   let event: any;
@@ -16,15 +17,42 @@ export const stripeWebhook = async (request: any, response: any, context: any) =
   try {
     // Verify webhook signature following Stripe documentation
     event = stripe.webhooks.constructEvent(body, signature, getStripeWebhookSecret());
-    console.log(`✅ Webhook signature verified. Event type: ${event.type}`);
+    console.log(`✅ Webhook signature verified. Event ID: ${event.id}, Type: ${event.type}`);
   } catch (err: any) {
     console.error(`❌ Webhook signature verification failed: ${err.message}`);
-    throw new HttpError(400, `Webhook signature verification failed: ${err.message}`);
+    return response.status(400).send(`Webhook signature verification failed: ${err.message}`);
   }
 
-  // Handle the event based on type
+  // Handle the event
+  const eventType = event.type;
+  const eventId = event.id;
+  
+  console.log(`✅ Webhook received: ${eventType} (${eventId})`);
+  
+  // Process asynchronously without blocking the response
+  setImmediate(async () => {
+    try {
+      console.log(`🔄 Starting async processing for ${eventType} (${eventId})`);
+      await processWebhookEvent(event, context);
+      console.log(`✅ Completed async processing for ${eventType} (${eventId})`);
+    } catch (error: any) {
+      console.error(`❌ Async processing failed for webhook ${eventType} (${eventId}):`, error);
+    }
+  });
+  
+  // Return a 200 response to acknowledge receipt of the event (Stripe's recommended approach)
+  response.send();
+};
+
+// Separate function to process webhook events
+async function processWebhookEvent(event: any, context: any) {
+  const eventType = event.type;
+  const eventId = event.id;
+  
+  console.log(`🔄 Processing webhook event: ${eventType} (${eventId})`);
+
   try {
-    switch (event.type) {
+    switch (eventType) {
       case 'customer.subscription.created':
         await handleSubscriptionCreated(event.data.object, context);
         break;
@@ -44,29 +72,49 @@ export const stripeWebhook = async (request: any, response: any, context: any) =
       case 'invoice.payment_failed':
         await handlePaymentFailed(event.data.object, context);
         break;
+
+      case 'checkout.session.completed':
+        await handleCheckoutCompleted(event.data.object, context);
+        break;
       
       default:
-        console.log(`🔔 Unhandled event type: ${event.type}`);
+        console.log(`🔔 Ignoring unhandled event type: ${eventType} (${eventId})`);
+        return;
     }
     
-    console.log(`✅ Successfully processed webhook: ${event.type}`);
+    console.log(`✅ Successfully processed webhook: ${eventType} (${eventId})`);
   } catch (error: any) {
-    console.error(`❌ Error processing webhook ${event.type}:`, error);
-    throw new HttpError(500, `Error processing webhook: ${error.message}`);
+    console.error(`❌ Error processing webhook ${eventType} (${eventId}):`, error);
+    // Don't throw here since we're in async processing
   }
-
-  return { received: true, eventType: event.type };
-};
+}
 
 // Handle subscription created
 async function handleSubscriptionCreated(subscription: any, context: any) {
-  console.log('🆕 Subscription created:', subscription.id);
+  console.log('🆕 Subscription created:', {
+    id: subscription.id,
+    customer: subscription.customer,
+    status: subscription.status,
+    plan: getPaymentPlanFromSubscription(subscription)
+  });
   
   // Update user subscription status in database
   if (subscription.customer) {
     try {
+      // First, check if user exists
+      const existingUser = await context.entities.Users.findFirst({
+        where: { paymentProcessorUserId: subscription.customer }
+      });
+      
+      if (!existingUser) {
+        console.error('❌ No user found with paymentProcessorUserId:', subscription.customer);
+        return;
+      }
+      
+      console.log('👤 Found user:', { id: existingUser.id, email: existingUser.email });
+      
       // First, cancel any existing active subscriptions for this customer to prevent duplicates
-      await context.entities.Users.updateMany({
+      const cancelResult = await context.entities.Users.updateMany({
         where: { 
           paymentProcessorUserId: subscription.customer,
           subscriptionStatus: 'active'
@@ -75,46 +123,125 @@ async function handleSubscriptionCreated(subscription: any, context: any) {
           subscriptionStatus: 'canceled'
         }
       });
+      
+      console.log('🔄 Canceled existing active subscriptions, affected rows:', cancelResult.count);
 
       // Then set the new subscription as active
       const result = await context.entities.Users.updateMany({
         where: { paymentProcessorUserId: subscription.customer },
         data: { 
-          subscriptionStatus: 'active',
+          subscriptionStatus: subscription.status || 'active',
           subscriptionPlan: getPaymentPlanFromSubscription(subscription),
           datePaid: new Date(),
         }
       });
       
-      console.log('✅ User subscription status updated to active, affected rows:', result.count);
+      console.log('✅ User subscription status updated, affected rows:', result.count);
+      
+      // Verify the update
+      const updatedUser = await context.entities.Users.findFirst({
+        where: { paymentProcessorUserId: subscription.customer }
+      });
+      
+      console.log('🔍 Updated user data:', {
+        subscriptionStatus: updatedUser?.subscriptionStatus,
+        subscriptionPlan: updatedUser?.subscriptionPlan,
+        datePaid: updatedUser?.datePaid
+      });
+      
     } catch (error) {
       console.error('❌ Failed to update user subscription status:', error);
     }
+  } else {
+    console.error('❌ No customer ID found in subscription object');
   }
 }
 
 // Helper function to extract plan from subscription
 function getPaymentPlanFromSubscription(subscription: any): string | null {
   try {
+    console.log('🔍 Extracting plan from subscription:', subscription.id);
+    
+    // Log subscription structure for debugging
+    console.log('📋 Subscription items:', subscription.items?.data?.length || 0);
+    
     // Extract the price ID from subscription items
     const priceId = subscription.items?.data?.[0]?.price?.id;
-    if (!priceId) return null;
+    console.log('💰 Price ID found:', priceId);
+    
+    if (!priceId) {
+      console.log('❌ No price ID found in subscription items');
+      return null;
+    }
 
-    // Map price IDs to plan names (you might need to adjust this based on your actual price IDs)
+    // Map price IDs to plan names - includes both mock and real price IDs
     const priceToplan: Record<string, string> = {
-      // Monthly plans
+      // Monthly plans (mock for development)
       'price_mock_starter_9_monthly': 'starter',
       'price_mock_pro_19_monthly': 'pro', 
       'price_mock_business_89_monthly': 'business',
-      // Annual plans  
+      // Annual plans (mock for development)
       'price_mock_starter_86_annual': 'starter',
       'price_mock_pro_182_annual': 'pro',
       'price_mock_business_854_annual': 'business',
+      // Real price IDs from your Stripe account
+      'price_1S9a1BKPBVKSP3Z42CpnaDkv': 'pro',     // $19.00 plan
+      'price_1S9a02KPBVKSP3Z4slA5Lv0y': 'starter', // $9.00 plan
     };
 
-    return priceToplan[priceId] || null;
+    const planName = priceToplan[priceId];
+    console.log('📦 Mapped plan name:', planName);
+    
+    if (!planName) {
+      console.log('⚠️ Unknown price ID:', priceId);
+      console.log('📋 Available price mappings:', Object.keys(priceToplan));
+      // Return a default or try to infer from price metadata
+      return inferPlanFromPrice(subscription.items.data[0].price);
+    }
+    
+    return planName;
   } catch (error) {
     console.error('❌ Error extracting plan from subscription:', error);
+    return null;
+  }
+}
+
+// Helper function to infer plan from price object when exact mapping is not found
+function inferPlanFromPrice(price: any): string | null {
+  try {
+    console.log('🔍 Inferring plan from price object:', {
+      id: price.id,
+      nickname: price.nickname,
+      unit_amount: price.unit_amount,
+      currency: price.currency
+    });
+    
+    // Try to infer from nickname if available
+    if (price.nickname) {
+      const nickname = price.nickname.toLowerCase();
+      if (nickname.includes('starter')) return 'starter';
+      if (nickname.includes('pro')) return 'pro';
+      if (nickname.includes('business')) return 'business';
+    }
+    
+    // Try to infer from price amount (in cents)
+    const amount = price.unit_amount / 100; // Convert from cents to dollars
+    console.log('💵 Price amount in dollars:', amount);
+    
+    // Match common price points
+    if (amount === 9) return 'starter';
+    if (amount === 19) return 'pro';
+    if (amount === 89) return 'business';
+    
+    // Monthly vs annual amounts
+    if (amount === 7.17 || amount === 86) return 'starter'; // Annual starter
+    if (amount === 15.17 || amount === 182) return 'pro';   // Annual pro
+    if (amount === 71.17 || amount === 854) return 'business'; // Annual business
+    
+    console.log('❓ Could not infer plan from price');
+    return null;
+  } catch (error) {
+    console.error('❌ Error inferring plan from price:', error);
     return null;
   }
 }
@@ -180,29 +307,43 @@ async function handlePaymentFailed(invoice: any, context: any) {
   // - Retry payment logic
 }
 
-export const stripeMiddlewareConfigFn: MiddlewareConfigFn = (middlewareConfig) => {
-  // For Wasp 0.17+, middlewareConfig is a Map
-  const newConfig = new Map(middlewareConfig);
+// Handle checkout session completed
+async function handleCheckoutCompleted(session: any, context: any) {
+  console.log('🛒 Checkout session completed:', session.id);
+  console.log('🔍 Customer ID:', session.customer);
+  console.log('🔍 Subscription ID:', session.subscription);
   
-  // Add express.raw() middleware for Stripe webhooks to preserve raw body
-  // This is essential for webhook signature verification
-  newConfig.set('rawBody', (req: any, res: any, next: any) => {
-    // Only apply raw body parsing for webhook endpoints
-    if (req.originalUrl && req.originalUrl.includes('/payments-webhook')) {
-      // Save the original body as buffer for signature verification
-      let data = '';
-      req.setEncoding('utf8');
-      req.on('data', (chunk: string) => {
-        data += chunk;
+  if (session.customer && session.subscription) {
+    try {
+      // Fetch the subscription details from Stripe to get accurate data
+      const subscription = await stripe.subscriptions.retrieve(session.subscription);
+      console.log('📋 Subscription details:', {
+        id: subscription.id,
+        status: subscription.status,
+        customer: subscription.customer
       });
-      req.on('end', () => {
-        req.body = data;
-        next();
+      
+      // Update user with subscription info
+      const result = await context.entities.Users.updateMany({
+        where: { paymentProcessorUserId: session.customer },
+        data: { 
+          subscriptionStatus: subscription.status,
+          subscriptionPlan: getPaymentPlanFromSubscription(subscription),
+          datePaid: new Date(),
+        }
       });
-    } else {
-      next();
+      
+      console.log('✅ User subscription updated via checkout completion, affected rows:', result.count);
+    } catch (error) {
+      console.error('❌ Failed to process checkout completion:', error);
     }
-  });
-  
-  return newConfig;
+  }
+}
+
+export const stripeMiddlewareConfigFn: MiddlewareConfigFn = (middlewareConfig) => {
+  // We need to delete the default 'express.json' middleware and replace it with 'express.raw' middleware
+  // because webhook data in the body of the request as raw JSON, not as JSON in the body of the request.
+  middlewareConfig.delete('express.json');
+  middlewareConfig.set('express.raw', express.raw({ type: 'application/json' }));
+  return middlewareConfig;
 };
