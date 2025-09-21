@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Separator } from '../../components/ui/separator';
 import { cn } from '../../utils/cn';
 import { CircleCheck } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
