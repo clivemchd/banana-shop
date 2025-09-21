@@ -1,7 +1,7 @@
 import "../../../index.css";
-import { Link } from "react-router-dom";
-import { useState } from "react";
-import { requestPasswordReset } from "wasp/client/auth";
+import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { requestPasswordReset, useAuth } from "wasp/client/auth";
 import { Environment } from "../../utils/environment";
 import {
   Card,
@@ -16,10 +16,19 @@ import { Label } from "../../components/ui/label";
 import Navbar from "../landing/navbar";
 
 export const ForgotPasswordPage = () => {
+  const { data: user } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [error, setError] = useState<string | Error | null>(null);
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

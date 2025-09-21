@@ -1,7 +1,7 @@
 import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import { resetPassword } from "wasp/client/auth";
+import { useState, useEffect } from "react";
+import { resetPassword, useAuth } from "wasp/client/auth";
 import { cn } from "../../../lib/utils";
 import {
   Card,
@@ -23,6 +23,7 @@ import {
 import Navbar from "../landing/navbar";
 
 export const PasswordResetPage = () => {
+  const { data: user } = useAuth();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -30,6 +31,13 @@ export const PasswordResetPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | Error | null>(null);
   const navigate = useNavigate();
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
