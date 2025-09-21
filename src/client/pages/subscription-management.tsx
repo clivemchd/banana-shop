@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from 'wasp/client/auth';
 import { useQuery } from 'wasp/client/operations';
-import { getCustomerPortalUrl } from 'wasp/client/operations';
+import { getCustomerPortalUrl, getCurrentUserSubscription, getLaunchSettings, generateCheckoutSession } from 'wasp/client/operations';
 import { useNavigate } from 'react-router-dom';
 import { paymentPlans, PaymentPlanId, getSubscriptionPaymentPlanIds } from '../../payment/plans';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { CreditCard, Calendar, Crown, Settings, ExternalLink, Check, X } from 'lucide-react';
+import { useState } from 'react';
 import Navbar from './landing/navbar';
 
 // Temporary type until operation is generated
@@ -24,6 +25,9 @@ type UserSubscriptionInfo = {
 const SubscriptionManagementPage = () => {
     const { data: user } = useAuth();
     const navigate = useNavigate();
+    const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+    const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const {
         data: customerPortalUrl,
@@ -31,32 +35,101 @@ const SubscriptionManagementPage = () => {
         error: portalError
     } = useQuery(getCustomerPortalUrl);
 
+    const {
+        data: subscriptionData,
+        isLoading: subscriptionLoading,
+        error: subscriptionError
+    } = useQuery(getCurrentUserSubscription);
+
+    const {
+        data: launchSettings,
+        isLoading: launchLoading,
+        error: launchError
+    } = useQuery(getLaunchSettings);
+
     // Redirect to login if not authenticated
     if (!user) {
         navigate('/login');
         return null;
     }
 
-    // Temporary: using user data directly until operation is generated
-    const subscription: UserSubscriptionInfo | null = user ? {
+    // Show loading state while subscription data is loading
+    if (subscriptionLoading || launchLoading) {
+        return (
+            <div className="min-h-screen bg-background">
+                <Navbar showFeatures={false} showPricing={false} />
+                <div className="container mx-auto px-4 py-8 max-w-6xl">
+                    <div className="flex items-center justify-center min-h-[50vh]">
+                        <div className="text-center">
+                            <div className="animate-pulse">Loading subscription data...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Use the subscription data from the query if available, otherwise fall back to user data
+    const subscription: UserSubscriptionInfo | null = subscriptionData || (user ? {
         isSubscribed: (user as any).subscriptionStatus === 'active',
         subscriptionStatus: (user as any).subscriptionStatus || null,
         subscriptionPlan: (user as any).subscriptionPlan || null,
         datePaid: (user as any).datePaid || null,
         credits: (user as any).credits || 0,
         paymentProcessorUserId: (user as any).paymentProcessorUserId || null,
-    } : null;
+    } : null);
 
-    // Helper function to navigate to pricing section
-    const handleShowPlanFeatures = () => {
-        navigate('/#pricing');
-        // Small delay to ensure navigation completes before scrolling
-        setTimeout(() => {
-            const pricingSection = document.getElementById('pricing');
-            if (pricingSection) {
-                pricingSection.scrollIntoView({ behavior: 'smooth' });
+    // Check if launch offer is active from server data
+    const isLaunchActive = launchSettings?.isLaunchOfferActive || false;
+    const discountPercent = launchSettings?.discountPercent || 0;
+
+    // Calculate maximum annual savings for the badge
+    const maxAnnualSavings = Math.max(
+        ...getSubscriptionPaymentPlanIds().map(planId => {
+            const plan = paymentPlans[planId];
+            if (plan.annualPrice) {
+                return Math.round(((plan.price * 12 - plan.annualPrice) / (plan.price * 12)) * 100);
             }
-        }, 100);
+            return 0;
+        })
+    );
+
+    // Debug: log user data to console to help troubleshoot subscription status
+    console.log('🔍 Debug - Subscription data:', {
+        fromQuery: subscriptionData,
+        fromUser: user ? {
+            subscriptionStatus: (user as any)?.subscriptionStatus,
+            subscriptionPlan: (user as any)?.subscriptionPlan,
+            paymentProcessorUserId: (user as any)?.paymentProcessorUserId,
+        } : null,
+        final: subscription
+    });
+
+    // Handle subscription purchase
+    const handleSubscribeClick = async (planId: PaymentPlanId) => {
+        if (!user) {
+            navigate('/signin');
+            return;
+        }
+
+        try {
+            setIsPaymentLoading(true);
+            setErrorMessage(null);
+            
+            const { sessionUrl } = await generateCheckoutSession({
+                paymentPlanId: planId,
+                billingCycle: billingCycle
+            });
+            
+            if (sessionUrl) {
+                window.location.href = sessionUrl;
+            }
+        } catch (error: any) {
+            console.error('Error creating checkout session:', error);
+            setErrorMessage(error.message || 'Something went wrong. Please try again.');
+        } finally {
+            setIsPaymentLoading(false);
+        }
     };
 
     const currentPlan = subscription?.subscriptionPlan
@@ -122,7 +195,18 @@ const SubscriptionManagementPage = () => {
                                 <div className="space-y-2">
                                     <p className="text-sm text-muted-foreground">Plan</p>
                                     <p className="text-2xl font-semibold">{currentPlan.name}</p>
-                                    <p className="text-muted-foreground">${currentPlan.price}/month</p>
+                                    <div className="flex items-center gap-2">
+                                        {isLaunchActive ? (
+                                            <>
+                                                                                                        <p className="text-muted-foreground">${Math.round(currentPlan.price * (1 - discountPercent / 100))}/month</p>
+                                                <Badge className="text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                                                    {discountPercent}% OFF
+                                                </Badge>
+                                            </>
+                                        ) : (
+                                            <p className="text-muted-foreground">${currentPlan.price}/month</p>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
@@ -239,19 +323,49 @@ const SubscriptionManagementPage = () => {
                                                 </Badge>
                                             )}
                                             {plan.isPopular && !isCurrentPlan && (
-                                                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2" variant="secondary">
+                                                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
                                                     Popular
                                                 </Badge>
                                             )}
                                             <CardTitle className="text-xl">{plan.name}</CardTitle>
                                             <div className="space-y-1">
-                                                <p className="text-3xl font-bold">${plan.price}</p>
-                                                <p className="text-sm text-muted-foreground">per month</p>
-                                                {plan.annualPrice && (
-                                                    <p className="text-xs text-muted-foreground">
-                                                        ${plan.annualPrice}/year (save ${(plan.price * 12) - plan.annualPrice})
-                                                    </p>
-                                                )}
+                                                {(() => {
+                                                    const currentPrice = billingCycle === 'annual' && plan.annualPrice 
+                                                        ? Math.round(plan.annualPrice / 12) // Convert annual to monthly display
+                                                        : plan.price;
+                                                    const displayPrice = isLaunchActive 
+                                                        ? Math.round(currentPrice * (1 - discountPercent / 100))
+                                                        : currentPrice;
+                                                    
+                                                    return (
+                                                        <>
+                                                            {isLaunchActive ? (
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    <p className="text-2xl font-bold">${displayPrice}</p>
+                                                                    <p className="text-lg text-muted-foreground line-through">${currentPrice}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-3xl font-bold">${displayPrice}</p>
+                                                            )}
+                                                            <p className="text-sm text-muted-foreground">
+                                                                per month{billingCycle === 'annual' ? ' (billed annually)' : ''}
+                                                            </p>
+                                                            {billingCycle === 'annual' && plan.annualPrice && (
+                                                                <div className="text-xs text-green-600">
+                                                                    {isLaunchActive 
+                                                                        ? `Save $${(Math.round(plan.price * (1 - discountPercent / 100)) * 12) - Math.round(plan.annualPrice * (1 - discountPercent / 100))} vs monthly`
+                                                                        : `Save $${(plan.price * 12) - plan.annualPrice} vs monthly`
+                                                                    }
+                                                                </div>
+                                                            )}
+                                                            {isLaunchActive && (
+                                                                <Badge className="text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                                                                    {discountPercent}% OFF
+                                                                </Badge>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </CardHeader>
                                         <CardContent className="pt-2">
@@ -261,17 +375,60 @@ const SubscriptionManagementPage = () => {
                                                 </Button>
                                             ) : (
                                                 <Button
-                                                    onClick={handleShowPlanFeatures}
+                                                    onClick={() => handleSubscribeClick(planId)}
+                                                    disabled={isPaymentLoading}
                                                     variant={plan.isPopular ? "default" : "outline"}
                                                     className="w-full"
                                                 >
-                                                    Choose Plan
+                                                    {isPaymentLoading ? 'Processing...' : 'Start Subscription'}
                                                 </Button>
                                             )}
                                         </CardContent>
                                     </Card>
                                 );
                             })}
+                        </div>
+
+                        {/* Error Message */}
+                        {errorMessage && (
+                            <div className="mb-6 p-4 border border-red-200 bg-red-50 rounded-md">
+                                <p className="text-red-700 text-sm">{errorMessage}</p>
+                            </div>
+                        )}
+
+                        {/* Launch Offer Banner */}
+                        {isLaunchActive && (
+                            <div className="mb-6 p-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg text-white text-center">
+                                <p className="text-lg font-semibold">🚀 Launch Special: {discountPercent}% OFF All Plans!</p>
+                                <p className="text-sm opacity-90">Limited time offer - Get started with AI image generation at discounted prices</p>
+                            </div>
+                        )}
+
+                        {/* Billing Cycle Toggle */}
+                        <div className="mb-8 flex justify-center">
+                            <div className="bg-muted p-1 rounded-lg flex">
+                                <Button
+                                    variant={billingCycle === 'monthly' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setBillingCycle('monthly')}
+                                    className="px-4 py-2"
+                                >
+                                    Monthly
+                                </Button>
+                                <Button
+                                    variant={billingCycle === 'annual' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setBillingCycle('annual')}
+                                    className="px-4 py-2"
+                                >
+                                    Annual
+                                    {maxAnnualSavings > 0 && (
+                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                            Save up to {maxAnnualSavings}%
+                                        </Badge>
+                                    )}
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Features Comparison Table */}
@@ -285,6 +442,14 @@ const SubscriptionManagementPage = () => {
                                             return (
                                                 <TableHead key={planId} className="text-center font-semibold">
                                                     {plan.name}
+                                                    <div className="text-xs font-normal text-muted-foreground mt-1">
+                                                        {billingCycle === 'annual' ? 'Billed Annually' : 'Billed Monthly'}
+                                                    </div>
+                                                    {isLaunchActive && (
+                                                        <div className="text-xs font-normal text-green-600 mt-1">
+                                                            {discountPercent}% OFF
+                                                        </div>
+                                                    )}
                                                 </TableHead>
                                             );
                                         })}

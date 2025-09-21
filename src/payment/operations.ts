@@ -100,3 +100,36 @@ export const getCustomerPortalUrl = async (_args: any, context: any) => {
     prismaUserDelegate: context.entities.Users,
   });
 };
+
+// Debug operation to help troubleshoot subscription issues
+export const getCurrentUserSubscription = async (_args: any, context: any) => {
+  if (!context.user) {
+    throw new HttpError(401, 'Only authenticated users are allowed to perform this operation');
+  }
+
+  const user = await context.entities.Users.findUnique({
+    where: { id: context.user.id },
+    select: {
+      id: true,
+      email: true,
+      subscriptionStatus: true,
+      subscriptionPlan: true,
+      paymentProcessorUserId: true,
+      datePaid: true,
+      credits: true,
+    },
+  });
+
+  if (!user) {
+    throw new HttpError(404, 'User not found');
+  }
+
+  return {
+    isSubscribed: user.subscriptionStatus === 'active',
+    subscriptionStatus: user.subscriptionStatus,
+    subscriptionPlan: user.subscriptionPlan,
+    datePaid: user.datePaid,
+    credits: user.credits,
+    paymentProcessorUserId: user.paymentProcessorUserId,
+  };
+};

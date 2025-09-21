@@ -10,6 +10,18 @@ export const stripePaymentProcessor: PaymentProcessor = {
   id: 'stripe',
   createCheckoutSession: async ({ userId, userEmail, paymentPlan, billingCycle = 'monthly', prismaUserDelegate }: CreateCheckoutSessionArgs) => {
     const customer = await fetchStripeCustomer(userEmail);
+    
+    // Check if user already has an active subscription
+    const user = await prismaUserDelegate.findUnique({
+      where: { id: userId },
+    });
+
+    // If this is a subscription and user already has an active subscription, 
+    // we'll allow it but the webhook will handle canceling the old one
+    if (user?.subscriptionStatus === 'active' && paymentPlan.effect.kind === 'subscription') {
+      console.log('⚠️ User already has active subscription, new subscription will replace it');
+    }
+
     const stripeSession = await createStripeCheckoutSession({
       priceId: paymentPlan.getPaymentProcessorPlanId(billingCycle),
       customerId: customer.id,

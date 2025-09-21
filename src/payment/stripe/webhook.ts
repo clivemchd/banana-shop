@@ -65,35 +65,75 @@ async function handleSubscriptionCreated(subscription: any, context: any) {
   // Update user subscription status in database
   if (subscription.customer) {
     try {
+      // First, cancel any existing active subscriptions for this customer to prevent duplicates
       await context.entities.Users.updateMany({
-        where: { stripeCustomerId: subscription.customer },
+        where: { 
+          paymentProcessorUserId: subscription.customer,
+          subscriptionStatus: 'active'
+        },
         data: { 
-          subscriptionStatus: 'active',
-          subscriptionId: subscription.id,
-          // Add other subscription details as needed
+          subscriptionStatus: 'canceled'
         }
       });
-      console.log('✅ User subscription status updated to active');
+
+      // Then set the new subscription as active
+      const result = await context.entities.Users.updateMany({
+        where: { paymentProcessorUserId: subscription.customer },
+        data: { 
+          subscriptionStatus: 'active',
+          subscriptionPlan: getPaymentPlanFromSubscription(subscription),
+          datePaid: new Date(),
+        }
+      });
+      
+      console.log('✅ User subscription status updated to active, affected rows:', result.count);
     } catch (error) {
       console.error('❌ Failed to update user subscription status:', error);
     }
   }
 }
 
+// Helper function to extract plan from subscription
+function getPaymentPlanFromSubscription(subscription: any): string | null {
+  try {
+    // Extract the price ID from subscription items
+    const priceId = subscription.items?.data?.[0]?.price?.id;
+    if (!priceId) return null;
+
+    // Map price IDs to plan names (you might need to adjust this based on your actual price IDs)
+    const priceToplan: Record<string, string> = {
+      // Monthly plans
+      'price_mock_starter_9_monthly': 'starter',
+      'price_mock_pro_19_monthly': 'pro', 
+      'price_mock_business_89_monthly': 'business',
+      // Annual plans  
+      'price_mock_starter_86_annual': 'starter',
+      'price_mock_pro_182_annual': 'pro',
+      'price_mock_business_854_annual': 'business',
+    };
+
+    return priceToplan[priceId] || null;
+  } catch (error) {
+    console.error('❌ Error extracting plan from subscription:', error);
+    return null;
+  }
+}
+
 // Handle subscription updated
 async function handleSubscriptionUpdated(subscription: any, context: any) {
-  console.log('📝 Subscription updated:', subscription.id);
+  console.log('📝 Subscription updated:', subscription.id, 'status:', subscription.status);
   
   if (subscription.customer) {
     try {
-      await context.entities.Users.updateMany({
-        where: { stripeCustomerId: subscription.customer },
+      const result = await context.entities.Users.updateMany({
+        where: { paymentProcessorUserId: subscription.customer },
         data: { 
           subscriptionStatus: subscription.status,
-          subscriptionId: subscription.id,
+          subscriptionPlan: getPaymentPlanFromSubscription(subscription),
+          ...(subscription.status === 'active' && { datePaid: new Date() })
         }
       });
-      console.log(`✅ User subscription status updated to ${subscription.status}`);
+      console.log(`✅ User subscription status updated to ${subscription.status}, affected rows:`, result.count);
     } catch (error) {
       console.error('❌ Failed to update user subscription status:', error);
     }
@@ -106,14 +146,14 @@ async function handleSubscriptionDeleted(subscription: any, context: any) {
   
   if (subscription.customer) {
     try {
-      await context.entities.Users.updateMany({
-        where: { stripeCustomerId: subscription.customer },
+      const result = await context.entities.Users.updateMany({
+        where: { paymentProcessorUserId: subscription.customer },
         data: { 
-          subscriptionStatus: 'deleted',
-          subscriptionId: null,
+          subscriptionStatus: 'canceled',
+          subscriptionPlan: null,
         }
       });
-      console.log('✅ User subscription status updated to deleted');
+      console.log('✅ User subscription status updated to canceled, affected rows:', result.count);
     } catch (error) {
       console.error('❌ Failed to update user subscription status:', error);
     }

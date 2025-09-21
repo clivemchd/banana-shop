@@ -158,5 +158,11 @@ export function calculateLaunchPrice(originalPrice: number): number {
 
 export function isLaunchOfferActive(): boolean {
   // Use LAUNCH_30 environment variable as source of truth
+  // This function should only be used server-side
+  // For client-side, use the getLaunchSettings query instead
+  if (typeof process === 'undefined') {
+    console.warn('⚠️ isLaunchOfferActive() called on client-side. Use getLaunchSettings query instead.');
+    return false; // Safe default for client
+  }
   return process.env.LAUNCH_30 === 'true';
 }
