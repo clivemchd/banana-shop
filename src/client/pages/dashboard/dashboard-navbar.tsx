@@ -1,11 +1,12 @@
 import { Button } from "../../components/ui/button";
 import { Link } from "wasp/client/router";
 import { logout, useAuth } from "wasp/client/auth";
+import { useNavigate } from "react-router-dom";
 import { Menu, SquareUser, Settings, CreditCard, LogOut, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import Logo from "../../core/logo/logo";
 
-const UserDropdown = ({ userEmail, profileImage }: { userEmail: string; profileImage?: string }) => {
+const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string; profileImage?: string; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -62,7 +63,7 @@ const UserDropdown = ({ userEmail, profileImage }: { userEmail: string; profileI
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  // TODO: Navigate to subscription page
+                  navigate('/subscription');
                 }}
                 className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
               >
@@ -90,7 +91,7 @@ const UserDropdown = ({ userEmail, profileImage }: { userEmail: string; profileI
   );
 };
 
-const MobileMenu = ({ userEmail, profileImage }: { userEmail: string; profileImage?: string }) => {
+const MobileMenu = ({ userEmail, profileImage, navigate }: { userEmail: string; profileImage?: string; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -166,7 +167,7 @@ const MobileMenu = ({ userEmail, profileImage }: { userEmail: string; profileIma
                 className="w-full justify-start gap-2"
                 onClick={() => {
                   setIsOpen(false);
-                  // TODO: Navigate to subscription page
+                  navigate('/subscription');
                 }}
               >
                 <CreditCard className="h-4 w-4" />
@@ -194,6 +195,7 @@ const MobileMenu = ({ userEmail, profileImage }: { userEmail: string; profileIma
 
 const DashboardNavbar = () => {
   const { data: user } = useAuth();
+  const navigate = useNavigate();
 
   // If user is not loaded yet, show loading state
   if (!user) {
@@ -224,11 +226,11 @@ const DashboardNavbar = () => {
         <div className="flex items-center gap-3">
           {/* Desktop User Dropdown */}
           <div className="hidden md:block">
-            <UserDropdown userEmail={userEmail} profileImage={profileImage} />
+            <UserDropdown userEmail={userEmail} profileImage={profileImage} navigate={navigate} />
           </div>
 
           {/* Mobile Menu */}
-          <MobileMenu userEmail={userEmail} profileImage={profileImage} />
+          <MobileMenu userEmail={userEmail} profileImage={profileImage} navigate={navigate} />
         </div>
       </div>
     </nav>

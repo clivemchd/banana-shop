@@ -7,7 +7,7 @@ import { Menu, Moon, Sun, SquareUser, LogOut, ChevronDown, Settings, CreditCard 
 import { useState, useEffect } from "react";
 import Logo from "../../core/logo/logo";
 
-const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated = false }: { className?: string; orientation?: "horizontal" | "vertical"; isAuthenticated?: boolean }) => {
+const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated = false, showFeatures = true, showPricing = true }: { className?: string; orientation?: "horizontal" | "vertical"; isAuthenticated?: boolean; showFeatures?: boolean; showPricing?: boolean }) => {
   const handleSectionClick = (sectionId: string) => {
     // If we're not on the home page, navigate to home first
     if (window.location.pathname !== '/') {
@@ -33,24 +33,28 @@ const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated =
           </button>
         </Link>
       )}
-      <button 
-        onClick={() => handleSectionClick('features')} 
-        className="text-sm font-medium hover:text-primary transition-colors text-left"
-      >
-        Features
-      </button>
+      {showFeatures && (
+        <button 
+          onClick={() => handleSectionClick('features')} 
+          className="text-sm font-medium hover:text-primary transition-colors text-left"
+        >
+          Features
+        </button>
+      )}
       {/* <button 
         onClick={() => handleSectionClick('faq')} 
         className="text-sm font-medium hover:text-primary transition-colors text-left"
       >
         FAQ
       </button> */}
-      <button 
-        onClick={() => handleSectionClick('pricing')} 
-        className="text-sm font-medium hover:text-primary transition-colors text-left"
-      >
-        Pricing
-      </button>
+      {showPricing && (
+        <button 
+          onClick={() => handleSectionClick('pricing')} 
+          className="text-sm font-medium hover:text-primary transition-colors text-left"
+        >
+          Pricing
+        </button>
+      )}
     </nav>
   );
 };
@@ -176,7 +180,7 @@ const ThemeToggle = () => {
   );
 };
 
-const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, navigate }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string; navigate: any }) => {
+const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, navigate, showFeatures = true, showPricing = true }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string; navigate: any; showFeatures?: boolean; showPricing?: boolean }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -198,7 +202,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
           <div className="mb-4">
             <Logo />
           </div>
-          <NavMenu orientation="vertical" className="mb-4" isAuthenticated={isAuthenticated} />
+          <NavMenu orientation="vertical" className="mb-4" isAuthenticated={isAuthenticated} showFeatures={showFeatures} showPricing={showPricing} />
           
           {isAuthenticated && userEmail ? (
             <div className="space-y-4">
@@ -283,7 +287,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
   );
 };
 
-const Navbar = () => {
+const Navbar = ({ showFeatures = true, showPricing = true }: { showFeatures?: boolean; showPricing?: boolean } = {}) => {
   const { data: user } = useAuth();
   const navigate = useNavigate();
   const isAuthenticated = !!user;
@@ -298,7 +302,7 @@ const Navbar = () => {
         </Link>
 
         {/* Desktop Menu */}
-        <NavMenu className="hidden md:block" isAuthenticated={isAuthenticated} />
+        <NavMenu className="hidden md:block" isAuthenticated={isAuthenticated} showFeatures={showFeatures} showPricing={showPricing} />
 
         <div className="flex items-center gap-3">
           {/* <ThemeToggle /> */}
@@ -329,6 +333,8 @@ const Navbar = () => {
               userEmail={userEmail}
               profileImage={profileImage}
               navigate={navigate}
+              showFeatures={showFeatures}
+              showPricing={showPricing}
             />
           </div>
         </div>
