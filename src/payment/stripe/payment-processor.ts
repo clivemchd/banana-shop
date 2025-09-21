@@ -1,4 +1,5 @@
 import type { PaymentPlanEffect } from '../plans';
+import { paymentPlans } from '../plans';
 import type { CreateCheckoutSessionArgs, FetchCustomerPortalUrlArgs, PaymentProcessor } from '../payment-processor.js';
 import { fetchStripeCustomer, createStripeCheckoutSession, getStripeCustomerPortalUrl } from './checkout-utils';
 import { stripeWebhook, stripeMiddlewareConfigFn } from './webhook';
@@ -7,16 +8,16 @@ export type StripeMode = 'subscription' | 'payment';
 
 export const stripePaymentProcessor: PaymentProcessor = {
   id: 'stripe',
-  createCheckoutSession: async ({ userId, userEmail, paymentPlan, prismaUserDelegate }: CreateCheckoutSessionArgs) => {
+  createCheckoutSession: async ({ userId, userEmail, paymentPlan, billingCycle = 'monthly', prismaUserDelegate }: CreateCheckoutSessionArgs) => {
     const customer = await fetchStripeCustomer(userEmail);
     const stripeSession = await createStripeCheckoutSession({
-      priceId: paymentPlan.getPaymentProcessorPlanId(),
+      priceId: paymentPlan.getPaymentProcessorPlanId(billingCycle),
       customerId: customer.id,
       mode: paymentPlanEffectToStripeMode(paymentPlan.effect),
       metadata: {
         userId,
-        planId: Object.keys(require('../plans').paymentPlans).find(
-          key => require('../plans').paymentPlans[key] === paymentPlan
+        planId: Object.keys(paymentPlans).find(
+          key => paymentPlans[key as keyof typeof paymentPlans] === paymentPlan
         ) || 'unknown',
       },
     });

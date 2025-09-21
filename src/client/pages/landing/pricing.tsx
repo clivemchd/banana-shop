@@ -6,6 +6,10 @@ import { CircleCheck, Sparkles } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
 import { Label } from '../../components/ui/label';
 import { isLaunchOfferActive, calculateLaunchPrice, calculateSavings } from '../../utils/launch-config';
+import { generateCheckoutSession } from 'wasp/client/operations';
+import { useAuth } from 'wasp/client/auth';
+import { useNavigate, Link } from 'react-router-dom';
+import { PaymentPlanId, paymentPlans } from '../../../payment/plans';
 
 const plans = [
 	{
@@ -22,6 +26,7 @@ const plans = [
 			'Community support',
 		],
 		cta: 'Get Started',
+		planId: PaymentPlanId.Starter,
 	},
 	{
 		name: 'Pro',
@@ -38,6 +43,7 @@ const plans = [
 		],
 		cta: 'Choose Pro',
 		featured: true,
+		planId: PaymentPlanId.Pro,
 	},
 	{
 		name: 'Business',
@@ -53,14 +59,85 @@ const plans = [
 			'Dedicated support',
 		],
 		cta: 'Get Started',
+		planId: PaymentPlanId.Business,
 	},
 ];
 
 const Pricing = () => {
 	const [billingCycle, setBillingCycle] = useState('monthly');
+	const [isPaymentLoading, setIsPaymentLoading] = useState<string | null>(null);
+	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	
 	// Check if launch offer is active from configuration
 	const showLaunchOffer = isLaunchOfferActive();
+	
+	// Auth and navigation
+	const { data: user } = useAuth();
+	const navigate = useNavigate();
+
+	// Get current subscription info from user data
+	const currentSubscription = user ? {
+		isSubscribed: (user as any).subscriptionStatus === 'active',
+		subscriptionPlan: (user as any).subscriptionPlan as PaymentPlanId | null,
+		subscriptionStatus: (user as any).subscriptionStatus || null,
+	} : null;
+
+	const currentPlan = currentSubscription?.subscriptionPlan 
+		? paymentPlans[currentSubscription.subscriptionPlan]
+		: null;
+
+	// Helper function to get button text and style for each plan
+	const getButtonConfig = (plan: typeof plans[0]) => {
+		if (!currentSubscription?.isSubscribed) {
+			return { text: plan.cta, style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
+		}
+
+		if (currentSubscription.subscriptionPlan === plan.planId) {
+			return { text: 'Current Plan', style: 'bg-muted text-muted-foreground cursor-not-allowed', disabled: true };
+		}
+
+		if (currentPlan) {
+			const isUpgrade = plan.price > currentPlan.price;
+			const isDowngrade = plan.price < currentPlan.price;
+			
+			if (isUpgrade) {
+				return { text: 'Upgrade', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
+			} else if (isDowngrade) {
+				return { text: 'Downgrade', style: 'bg-secondary text-secondary-foreground hover:bg-secondary/80', disabled: false };
+			}
+		}
+
+		return { text: plan.cta, style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
+	};
+
+	const handleGetStarted = async (planId: PaymentPlanId) => {
+		if (!user) {
+			// Redirect to signup if not authenticated
+			navigate('/signup');
+			return;
+		}
+
+		try {
+			setIsPaymentLoading(planId);
+			setErrorMessage(null);
+			
+			// Generate checkout session with billing cycle
+			const normalizedBillingCycle = billingCycle === 'annually' ? 'annual' : 'monthly';
+			const { sessionUrl } = await generateCheckoutSession({
+				paymentPlanId: planId,
+				billingCycle: normalizedBillingCycle
+			} as any);
+			
+			if (sessionUrl) {
+				// Redirect to Stripe checkout
+				window.location.href = sessionUrl;
+			}
+		} catch (error: any) {
+			console.error('Error creating checkout session:', error);
+			setErrorMessage(error.message || 'Something went wrong. Please try again.');
+			setIsPaymentLoading(null);
+		}
+	};
 
 	return (
 		<section id='pricing' className='py-20'>
@@ -74,6 +151,34 @@ const Pricing = () => {
 							<Sparkles className='h-5 w-5' />
 							<span>Launch Offer: Use code LAUNCH30 for 30% off first 3 months!</span>
 						</div>
+					</div>
+				)}
+
+				{/* Current Subscription Status */}
+				{currentSubscription?.isSubscribed && (
+					<div className='mb-8 p-4 border border-green-200 bg-green-50 rounded-md max-w-2xl mx-auto'>
+						<p className='text-green-700 text-sm text-center'>
+							<strong>Current Plan:</strong> {currentPlan?.name || 'Unknown'} - ${currentPlan?.price || 0}/month
+							{currentSubscription.subscriptionStatus !== 'active' && (
+								<span className='ml-2 text-orange-600'>
+									(Status: {currentSubscription.subscriptionStatus})
+								</span>
+							)}
+						</p>
+						<p className='text-green-600 text-xs text-center mt-1'>
+							<Link to='/subscription' className='underline hover:text-green-700'>
+								Manage your subscription →
+							</Link>
+						</p>
+					</div>
+				)}
+
+				{/* Error Alert */}
+				{errorMessage && (
+					<div className='mb-8 p-4 border border-red-200 bg-red-50 rounded-md max-w-2xl mx-auto'>
+						<p className='text-red-700 text-sm text-center'>
+							{errorMessage}
+						</p>
 					</div>
 				)}
 				
@@ -188,15 +293,18 @@ const Pricing = () => {
 								))}
 							</ul>
 							<div className='mt-auto pt-6'>
-								<Button
-									className={`w-full py-2 rounded-md ${
-										plan.featured
-											? 'bg-primary text-primary-foreground'
-											: 'bg-secondary text-secondary-foreground'
-									}`}
-								>
-									{plan.cta}
-								</Button>
+								{(() => {
+									const buttonConfig = getButtonConfig(plan);
+									return (
+										<Button
+											onClick={() => handleGetStarted(plan.planId)}
+											disabled={isPaymentLoading === plan.planId || buttonConfig.disabled}
+											className={`w-full py-2 rounded-md ${buttonConfig.style}`}
+										>
+											{isPaymentLoading === plan.planId ? 'Processing...' : buttonConfig.text}
+										</Button>
+									);
+								})()}
 							</div>
 						</div>
 					))}

@@ -10,7 +10,7 @@ const stripeConfig = {
 // Use test keys in development, production keys in production
 const stripeSecretKey = Environment.isDevelopment 
   ? Environment.requireVar('STRIPE_SECRET_KEY_TEST')
-  : Environment.requireVar('STRIPE_SECRET_KEY_LIVE');
+  : Environment.requireVar('STRIPE_SECRET_KEY_PROD');
 
 export const stripe = new Stripe(stripeSecretKey, stripeConfig);
 
@@ -18,12 +18,12 @@ export const stripe = new Stripe(stripeSecretKey, stripeConfig);
 export const getStripeWebhookSecret = () => {
   return Environment.isDevelopment
     ? Environment.requireVar('STRIPE_WEBHOOK_SECRET_TEST')
-    : Environment.requireVar('STRIPE_WEBHOOK_SECRET_LIVE');
+    : Environment.requireVar('STRIPE_WEBHOOK_SECRET_PROD');
 };
 
 // Helper to get publishable key for frontend
 export const getStripePublishableKey = () => {
   return Environment.isDevelopment
     ? Environment.requireVar('STRIPE_PUBLISHABLE_KEY_TEST')
-    : Environment.requireVar('STRIPE_PUBLISHABLE_KEY_LIVE');
+    : Environment.requireVar('STRIPE_PUBLISHABLE_KEY_PROD');
 };

@@ -1,6 +1,7 @@
 import { Button } from "../../components/ui/button";
 import { Link } from "wasp/client/router";
 import { logout, useAuth } from "wasp/client/auth";
+import { useNavigate } from "react-router-dom";
 // import { Sheet, SheetContent, SheetTrigger } from "../../components/ui/sheet";
 import { Menu, Moon, Sun, SquareUser, LogOut, ChevronDown, Settings, CreditCard } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -54,7 +55,7 @@ const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated =
   );
 };
 
-const UserDropdown = ({ userEmail, profileImage }: { userEmail: string; profileImage?: string }) => {
+const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string; profileImage?: string; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -111,7 +112,7 @@ const UserDropdown = ({ userEmail, profileImage }: { userEmail: string; profileI
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  // TODO: Navigate to subscription page
+                  navigate('/subscription');
                 }}
                 className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
               >
@@ -175,7 +176,7 @@ const ThemeToggle = () => {
   );
 };
 
-const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string }) => {
+const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, navigate }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -239,7 +240,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage }: {
                   className="w-full justify-start gap-2"
                   onClick={() => {
                     setIsOpen(false);
-                    // TODO: Navigate to subscription page
+                    navigate('/subscription');
                   }}
                 >
                   <CreditCard className="h-4 w-4" />
@@ -284,6 +285,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage }: {
 
 const Navbar = () => {
   const { data: user } = useAuth();
+  const navigate = useNavigate();
   const isAuthenticated = !!user;
   const userEmail = user?.email || user?.username || "User";
   const profileImage = (user as any)?.profileImage || null;
@@ -304,7 +306,7 @@ const Navbar = () => {
           {isAuthenticated ? (
             // Show user dropdown when authenticated
             <div className="hidden sm:block">
-              <UserDropdown userEmail={userEmail} profileImage={profileImage} />
+              <UserDropdown userEmail={userEmail} profileImage={profileImage} navigate={navigate} />
             </div>
           ) : (
             // Show sign in/create account buttons when not authenticated
@@ -326,6 +328,7 @@ const Navbar = () => {
               isAuthenticated={isAuthenticated}
               userEmail={userEmail}
               profileImage={profileImage}
+              navigate={navigate}
             />
           </div>
         </div>

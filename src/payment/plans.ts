@@ -5,8 +5,24 @@ function requireNodeEnvVar(key: string): string {
     return `placeholder_${key}`;
   }
   const value = process.env[key];
-  if (!value) {
-    throw new Error(`Required environment variable ${key} is not set`);
+  
+  // Development mode: provide mock price IDs if not set or placeholder
+  if (!value || value.includes('price_...') || value.includes('placeholder_')) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`⚠️ Using mock price ID for ${key}. Set up real Stripe products for production.`);
+      // Return mock price IDs for development testing
+      const mockPriceIds: Record<string, string> = {
+        'STRIPE_STARTER_MONTHLY_PRICE_ID': 'price_mock_starter_9_monthly',
+        'STRIPE_STARTER_ANNUAL_PRICE_ID': 'price_mock_starter_86_annual',
+        'STRIPE_PRO_MONTHLY_PRICE_ID': 'price_mock_pro_19_monthly',
+        'STRIPE_PRO_ANNUAL_PRICE_ID': 'price_mock_pro_182_annual',
+        'STRIPE_BUSINESS_MONTHLY_PRICE_ID': 'price_mock_business_89_monthly',
+        'STRIPE_BUSINESS_ANNUAL_PRICE_ID': 'price_mock_business_854_annual',
+        'STRIPE_CREDITS_PRICE_ID': 'price_mock_credits_19_onetime',
+      };
+      return mockPriceIds[key] || `mock_${key}`;
+    }
+    throw new Error(`Required environment variable ${key} is not set or is a placeholder. Please set up real Stripe price IDs.`);
   }
   return value;
 }
@@ -28,10 +44,11 @@ export enum PaymentPlanId {
 export interface PaymentPlan {
   // Returns the id under which this payment plan is identified on your payment processor.
   // E.g. this might be price id on Stripe, or variant id on LemonSqueezy.
-  getPaymentProcessorPlanId: () => string;
+  getPaymentProcessorPlanId: (billingCycle?: 'monthly' | 'annual') => string;
   effect: PaymentPlanEffect;
   name: string;
   price: number;
+  annualPrice?: number; // Annual price for subscriptions
   description: string;
   features: string[];
   isPopular?: boolean;
@@ -46,43 +63,58 @@ export const LAUNCH_DISCOUNT_PERCENT = 30;
 
 export const paymentPlans: Record<PaymentPlanId, PaymentPlan> = {
   [PaymentPlanId.Starter]: {
-    getPaymentProcessorPlanId: () => requireNodeEnvVar('STRIPE_STARTER_PRICE_ID'),
+    getPaymentProcessorPlanId: (billingCycle: 'monthly' | 'annual' = 'monthly') => {
+      return billingCycle === 'annual' 
+        ? requireNodeEnvVar('STRIPE_STARTER_ANNUAL_PRICE_ID')
+        : requireNodeEnvVar('STRIPE_STARTER_MONTHLY_PRICE_ID');
+    },
     effect: { kind: 'subscription' },
     name: 'Starter',
     price: 9,
+    annualPrice: 86,
     description: 'Perfect for getting started and occasional use.',
     features: [
+      '80 image generations',
       '40 image edits per month',
       'Standard processing speed',
-      'Community support',
-      'Overages: $0.20/credit'
+      'Community support'
     ],
   },
   [PaymentPlanId.Pro]: {
-    getPaymentProcessorPlanId: () => requireNodeEnvVar('STRIPE_PRO_PRICE_ID'),
+    getPaymentProcessorPlanId: (billingCycle: 'monthly' | 'annual' = 'monthly') => {
+      return billingCycle === 'annual' 
+        ? requireNodeEnvVar('STRIPE_PRO_ANNUAL_PRICE_ID')
+        : requireNodeEnvVar('STRIPE_PRO_MONTHLY_PRICE_ID');
+    },
     effect: { kind: 'subscription' },
     name: 'Pro',
     price: 19,
+    annualPrice: 182,
     description: 'For hobbyists and regular users.',
     features: [
+      '360 image generations',
       '180 image edits per month',
       'Faster processing',
-      'Email support',
-      'Overages: $0.15/credit'
+      'Email support'
     ],
     isPopular: true,
   },
   [PaymentPlanId.Business]: {
-    getPaymentProcessorPlanId: () => requireNodeEnvVar('STRIPE_BUSINESS_PRICE_ID'),
+    getPaymentProcessorPlanId: (billingCycle: 'monthly' | 'annual' = 'monthly') => {
+      return billingCycle === 'annual' 
+        ? requireNodeEnvVar('STRIPE_BUSINESS_ANNUAL_PRICE_ID')
+        : requireNodeEnvVar('STRIPE_BUSINESS_MONTHLY_PRICE_ID');
+    },
     effect: { kind: 'subscription' },
     name: 'Business',
     price: 89,
+    annualPrice: 854,
     description: 'For power users and small businesses.',
     features: [
+      '2,000 image generations',
       '1,000 image edits per month',
       'Highest priority processing',
-      'Dedicated support',
-      'Overages: $0.12/credit'
+      'Dedicated support'
     ],
   },
   [PaymentPlanId.Credits]: {

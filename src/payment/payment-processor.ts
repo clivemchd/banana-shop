@@ -5,6 +5,7 @@ export interface CreateCheckoutSessionArgs {
   userId: string;
   userEmail: string;
   paymentPlan: PaymentPlan;
+  billingCycle?: 'monthly' | 'annual';
   prismaUserDelegate: PrismaClient['users'];
 }
 

@@ -77,9 +77,10 @@ page DashboardPage {
 	component: import { DashboardPage } from "@src/client/pages/dashboard/dashboard"
 }
 
-route PricingPageRoute { path: "/pricing", to: PricingPage }
-page PricingPage {
-	component: import { PricingPage } from "@src/payment/pricing-page"
+route SubscriptionManagementRoute { path: "/subscription", to: SubscriptionManagementPage }
+page SubscriptionManagementPage {
+	authRequired: true,
+	component: import SubscriptionManagementPage from "@src/client/pages/subscription-management"
 }
 
 route CheckoutPageRoute { path: "/checkout", to: CheckoutPage }
@@ -110,9 +111,15 @@ query getLaunchSettings {
 	fn: import { getLaunchSettings } from "@src/server/launch-settings"
 }
 
+query getCurrentUserSubscription {
+	fn: import { getCurrentUserSubscription } from "@src/user/user-operations",
+	entities: [Users]
+}
+
 // Stripe webhook
 api paymentsWebhook {
 	fn: import { stripeWebhook } from "@src/payment/stripe/webhook",
+	middlewareConfigFn: import { stripeMiddlewareConfigFn } from "@src/payment/stripe/webhook",
 	entities: [Users],
 	httpRoute: (POST, "/payments-webhook")
 }
