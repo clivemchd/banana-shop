@@ -372,6 +372,36 @@ const SubscriptionManagementPage = () => {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
+                        {/* Billing Cycle Toggle */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                            <div></div> {/* Empty cell to align with feature column */}
+                            <div className="md:col-span-3 flex justify-center">
+                                <div className="bg-muted p-1 rounded-lg flex">
+                                    <Button
+                                        variant={billingCycle === 'monthly' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setBillingCycle('monthly')}
+                                        className="px-4 py-2"
+                                    >
+                                        Monthly
+                                    </Button>
+                                    <Button
+                                        variant={billingCycle === 'annual' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setBillingCycle('annual')}
+                                        className="px-4 py-2"
+                                    >
+                                        Annual
+                                        {maxAnnualSavings > 0 && (
+                                            <Badge variant="secondary" className="ml-2 text-xs">
+                                                Save up to {maxAnnualSavings}%
+                                            </Badge>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Plan Headers */}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                             <div></div> {/* Empty cell for feature column */}
@@ -460,33 +490,6 @@ const SubscriptionManagementPage = () => {
                                 <p className="text-sm opacity-90">Limited time offer - Get started with AI image generation at discounted prices</p>
                             </div>
                         )}
-
-                        {/* Billing Cycle Toggle */}
-                        <div className="mb-8 flex justify-center">
-                            <div className="bg-muted p-1 rounded-lg flex">
-                                <Button
-                                    variant={billingCycle === 'monthly' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setBillingCycle('monthly')}
-                                    className="px-4 py-2"
-                                >
-                                    Monthly
-                                </Button>
-                                <Button
-                                    variant={billingCycle === 'annual' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setBillingCycle('annual')}
-                                    className="px-4 py-2"
-                                >
-                                    Annual
-                                    {maxAnnualSavings > 0 && (
-                                        <Badge variant="secondary" className="ml-2 text-xs">
-                                            Save up to {maxAnnualSavings}%
-                                        </Badge>
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
 
                         {/* Features Comparison Table */}
                         <div className="border rounded-lg overflow-hidden">
