@@ -1,13 +1,16 @@
 import { Button } from "../../components/ui/button";
 import { Link } from "wasp/client/router";
 import { logout, useAuth } from "wasp/client/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 // import { Sheet, SheetContent, SheetTrigger } from "../../components/ui/sheet";
-import { Menu, Moon, Sun, SquareUser, LogOut, ChevronDown, Settings, CreditCard } from "lucide-react";
+import { Menu, Moon, Sun, SquareUser, LogOut, ChevronDown, Settings, CreditCard, Zap } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useQuery } from "wasp/client/operations";
+import { getCurrentUserSubscription } from "wasp/client/operations";
 import Logo from "../../core/logo/logo";
 
-const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated = false, showFeatures = true, showPricing = true }: { className?: string; orientation?: "horizontal" | "vertical"; isAuthenticated?: boolean; showFeatures?: boolean; showPricing?: boolean }) => {
+const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated = false }: { className?: string; orientation?: "horizontal" | "vertical"; isAuthenticated?: boolean }) => {
+  const location = useLocation();
   const handleSectionClick = (sectionId: string) => {
     // If we're not on the home page, navigate to home first
     if (window.location.pathname !== '/') {
@@ -26,34 +29,31 @@ const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated =
 
   return (
     <nav className={`${className} ${orientation === "vertical" ? "flex flex-col items-start gap-6" : "hidden md:flex items-center gap-6"}`}>
-      {isAuthenticated && (
-        <Link to="/dashboard">
-          <button className="text-sm font-medium hover:text-primary transition-colors text-left">
-            Dashboard
+      {isAuthenticated ? (
+        // Authenticated user navigation - only show Dashboard link if not currently on dashboard
+        location.pathname !== '/dashboard' && (
+          <Link to="/dashboard">
+            <button className="text-sm font-medium hover:text-primary transition-colors text-left">
+              Dashboard
+            </button>
+          </Link>
+        )
+      ) : (
+        // Non-authenticated user navigation
+        <>
+          <button 
+            onClick={() => handleSectionClick('features')} 
+            className="text-sm font-medium hover:text-primary transition-colors text-left"
+          >
+            Features
           </button>
-        </Link>
-      )}
-      {showFeatures && (
-        <button 
-          onClick={() => handleSectionClick('features')} 
-          className="text-sm font-medium hover:text-primary transition-colors text-left"
-        >
-          Features
-        </button>
-      )}
-      {/* <button 
-        onClick={() => handleSectionClick('faq')} 
-        className="text-sm font-medium hover:text-primary transition-colors text-left"
-      >
-        FAQ
-      </button> */}
-      {showPricing && (
-        <button 
-          onClick={() => handleSectionClick('pricing')} 
-          className="text-sm font-medium hover:text-primary transition-colors text-left"
-        >
-          Pricing
-        </button>
+          <button 
+            onClick={() => handleSectionClick('pricing')} 
+            className="text-sm font-medium hover:text-primary transition-colors text-left"
+          >
+            Pricing
+          </button>
+        </>
       )}
     </nav>
   );
@@ -144,6 +144,54 @@ const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string
   );
 };
 
+const CreditsDisplay = ({ showOnPaths = [] }: { showOnPaths?: string[] }) => {
+  const location = useLocation();
+  const { data: subscription } = useQuery(getCurrentUserSubscription);
+  
+  // Only show credits on specific pages
+  const shouldShowCredits = showOnPaths.length === 0 || showOnPaths.some(path => location.pathname === path);
+  
+  if (!shouldShowCredits || !subscription) {
+    return null;
+  }
+
+  return (
+    <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-accent/50 rounded-full border">
+      <Zap className="h-4 w-4 text-yellow-500" />
+      <span className="text-sm font-medium">
+        {subscription.credits || 0}
+      </span>
+      <span className="text-xs text-muted-foreground">credits</span>
+    </div>
+  );
+};
+
+const MobileCreditsDisplay = ({ showOnPaths = [] }: { showOnPaths?: string[] }) => {
+  const location = useLocation();
+  const { data: subscription } = useQuery(getCurrentUserSubscription);
+  
+  // Only show credits on specific pages
+  const shouldShowCredits = showOnPaths.length === 0 || showOnPaths.some(path => location.pathname === path);
+  
+  if (!shouldShowCredits || !subscription) {
+    return null;
+  }
+
+  return (
+    <div className="p-3 bg-accent/50 rounded-lg border">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-yellow-500" />
+          <span className="text-sm font-medium">Credits Available</span>
+        </div>
+        <span className="text-lg font-semibold">
+          {subscription.credits || 0}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const ThemeToggle = () => {
   const [mounted, setMounted] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -180,7 +228,7 @@ const ThemeToggle = () => {
   );
 };
 
-const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, navigate, showFeatures = true, showPricing = true }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string; navigate: any; showFeatures?: boolean; showPricing?: boolean }) => {
+const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, navigate }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -202,7 +250,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
           <div className="mb-4">
             <Logo />
           </div>
-          <NavMenu orientation="vertical" className="mb-4" isAuthenticated={isAuthenticated} showFeatures={showFeatures} showPricing={showPricing} />
+          <NavMenu orientation="vertical" className="mb-4" isAuthenticated={isAuthenticated} />
           
           {isAuthenticated && userEmail ? (
             <div className="space-y-4">
@@ -224,6 +272,9 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
                   <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
                 </div>
               </div>
+
+              {/* Credits Display for Mobile */}
+              <MobileCreditsDisplay showOnPaths={['/dashboard', '/subscription']} />
               
               {/* Menu Items */}
               <div className="space-y-2">
@@ -287,7 +338,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
   );
 };
 
-const Navbar = ({ showFeatures = true, showPricing = true }: { showFeatures?: boolean; showPricing?: boolean } = {}) => {
+const Navbar = () => {
   const { data: user } = useAuth();
   const navigate = useNavigate();
   const isAuthenticated = !!user;
@@ -302,16 +353,19 @@ const Navbar = ({ showFeatures = true, showPricing = true }: { showFeatures?: bo
         </Link>
 
         {/* Desktop Menu */}
-        <NavMenu className="hidden md:block" isAuthenticated={isAuthenticated} showFeatures={showFeatures} showPricing={showPricing} />
+        <NavMenu className="hidden md:block" isAuthenticated={isAuthenticated} />
 
         <div className="flex items-center gap-3">
           {/* <ThemeToggle /> */}
           
           {isAuthenticated ? (
-            // Show user dropdown when authenticated
-            <div className="hidden sm:block">
-              <UserDropdown userEmail={userEmail} profileImage={profileImage} navigate={navigate} />
-            </div>
+            // Show credits and user dropdown when authenticated
+            <>
+              <CreditsDisplay showOnPaths={['/dashboard', '/subscription']} />
+              <div className="hidden sm:block">
+                <UserDropdown userEmail={userEmail} profileImage={profileImage} navigate={navigate} />
+              </div>
+            </>
           ) : (
             // Show sign in/create account buttons when not authenticated
             <>
@@ -333,8 +387,6 @@ const Navbar = ({ showFeatures = true, showPricing = true }: { showFeatures?: bo
               userEmail={userEmail}
               profileImage={profileImage}
               navigate={navigate}
-              showFeatures={showFeatures}
-              showPricing={showPricing}
             />
           </div>
         </div>

@@ -66,7 +66,7 @@ const SubscriptionManagementPage = () => {
     if (subscriptionLoading || launchLoading) {
         return (
             <div className="min-h-screen bg-background">
-                <Navbar showFeatures={false} showPricing={false} />
+                <Navbar />
                 <div className="container mx-auto px-4 py-8 max-w-6xl">
                     <div className="flex items-center justify-center min-h-[50vh]">
                         <div className="text-center">
@@ -191,7 +191,7 @@ const SubscriptionManagementPage = () => {
 
     return (
         <div className="min-h-screen bg-background">
-            <Navbar showFeatures={false} showPricing={false} />
+            <Navbar />
 
             <div className="container mx-auto px-4 py-8 max-w-6xl">
                 {/* Page Header */}
@@ -212,7 +212,7 @@ const SubscriptionManagementPage = () => {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                             {/* Plan Info - Only show if user has a subscription */}
                             {currentPlan && (
                                 <div className="space-y-2">
@@ -252,6 +252,34 @@ const SubscriptionManagementPage = () => {
                                 <p className="text-sm text-muted-foreground">Status</p>
                                 <div>{getSubscriptionStatusBadge()}</div>
                             </div>
+
+                            {/* Credits Available */}
+                            <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">Credits Available</p>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    <p className="text-lg font-semibold">{subscription?.credits || 0}</p>
+                                </div>
+                            </div>
+
+                            {/* Next Billing Date */}
+                            {subscription?.datePaid && subscription?.subscriptionStatus === 'active' && (
+                                <div className="space-y-2">
+                                    <p className="text-sm text-muted-foreground">Next Billing</p>
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        <p>
+                                            {(() => {
+                                                const lastPayment = new Date(subscription.datePaid);
+                                                const nextBilling = new Date(lastPayment);
+                                                // Assume monthly billing by default, adjust based on detected cycle
+                                                nextBilling.setMonth(nextBilling.getMonth() + (currentBillingCycle === 'annual' ? 12 : 1));
+                                                return nextBilling.toLocaleDateString();
+                                            })()}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Last Payment */}
                             {subscription?.datePaid && (
