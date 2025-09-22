@@ -9,7 +9,7 @@ import { isLaunchOfferActive, calculateLaunchPrice, calculateSavings } from '../
 import { generateCheckoutSession } from 'wasp/client/operations';
 import { useAuth } from 'wasp/client/auth';
 import { useNavigate, Link } from 'react-router-dom';
-import { PaymentPlanId, paymentPlans } from '../../../payment/plans';
+import { PaymentPlanId, paymentPlans } from '../../../server/payment/plans';
 import { 
 	getUnifiedPlans, 
 	calculatePlanPricing, 

@@ -3,14 +3,14 @@ import { useAuth } from 'wasp/client/auth';
 import { useQuery } from 'wasp/client/operations';
 import { getCustomerPortalUrl, getCurrentUserSubscription, getLaunchSettings, generateCheckoutSession } from 'wasp/client/operations';
 import { useNavigate } from 'react-router-dom';
-import { paymentPlans, PaymentPlanId, getSubscriptionPaymentPlanIds } from '../../payment/plans';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { paymentPlans, PaymentPlanId, getSubscriptionPaymentPlanIds } from '../../../server/payment/plans';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { CreditCard, Calendar, Crown, Settings, ExternalLink, Check, X } from 'lucide-react';
 import { useState } from 'react';
-import Navbar from './landing/navbar';
+import Navbar from '../landing/navbar';
 import { 
     getUnifiedPlans, 
     calculatePlanPricing, 
@@ -19,7 +19,7 @@ import {
     formatPrice,
     type BillingCycle,
     type PlanPricing 
-} from '../utils/pricing-calculations';
+} from '../../utils/pricing-calculations';
 
 // Temporary type until operation is generated
 type UserSubscriptionInfo = {

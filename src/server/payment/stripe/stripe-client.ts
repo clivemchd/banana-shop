@@ -1,5 +1,5 @@
 import { Stripe } from 'stripe';
-import { Environment } from '../../server/utils/environment';
+import { Environment } from '../../../server/utils/environment';
 
 // t3dotgg best practice: Separate test and production configurations
 const stripeConfig = {

@@ -80,12 +80,12 @@ page DashboardPage {
 route SubscriptionManagementRoute { path: "/subscription", to: SubscriptionManagementPage }
 page SubscriptionManagementPage {
 	authRequired: true,
-	component: import SubscriptionManagementPage from "@src/client/pages/subscription-management"
+	component: import SubscriptionManagementPage from "@src/client/pages/subscriptions/subscription-management"
 }
 
 route CheckoutPageRoute { path: "/checkout", to: CheckoutPage }
 page CheckoutPage {
-	component: import CheckoutPage from "@src/payment/checkout-page"
+	component: import CheckoutPage from "@src/server/payment/checkout-page"
 }
 
 query generateTextToImage {
@@ -98,12 +98,12 @@ query generateImageToImage {
 
 // Payment operations
 action generateCheckoutSession {
-	fn: import { generateCheckoutSession } from "@src/payment/operations",
+	fn: import { generateCheckoutSession } from "@src/server/payment/operations",
 	entities: [Users]
 }
 
 query getCustomerPortalUrl {
-	fn: import { getCustomerPortalUrl } from "@src/payment/operations",
+	fn: import { getCustomerPortalUrl } from "@src/server/payment/operations",
 	entities: [Users]
 }
 
@@ -117,14 +117,14 @@ query getCurrentUserSubscription {
 }
 
 action syncUserSubscription {
-	fn: import { syncUserSubscription } from "@src/payment/operations",
+	fn: import { syncUserSubscription } from "@src/server/payment/operations",
 	entities: [Users]
 }
 
 // Stripe webhook
 api paymentsWebhook {
-	fn: import { stripeWebhook } from "@src/payment/stripe/webhook",
-	middlewareConfigFn: import { stripeMiddlewareConfigFn } from "@src/payment/stripe/webhook",
+	fn: import { stripeWebhook } from "@src/server/payment/stripe/webhook",
+	middlewareConfigFn: import { stripeMiddlewareConfigFn } from "@src/server/payment/stripe/webhook",
 	entities: [Users],
 	httpRoute: (POST, "/payments-webhook")
 }

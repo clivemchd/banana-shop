@@ -1,4 +1,4 @@
-import { PaymentPlanId } from '../payment/plans';
+import { PaymentPlanId } from '../server/payment/plans';
 import type { Users } from 'wasp/entities';
 import { HttpError } from 'wasp/server';
 

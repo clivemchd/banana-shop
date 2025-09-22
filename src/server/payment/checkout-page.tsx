@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
-import { Button } from '../client/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../client/components/ui/card';
+import { Button } from '../../client/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../client/components/ui/card';
 
 export default function CheckoutPage() {
   const [paymentStatus, setPaymentStatus] = useState<'loading' | 'success' | 'canceled' | 'error'>('loading');

@@ -1,4 +1,4 @@
-import { PaymentPlanId, paymentPlans } from '../../payment/plans';
+import { PaymentPlanId, paymentPlans } from '../../server/payment/plans';
 
 export type BillingCycle = 'monthly' | 'annual';
 
