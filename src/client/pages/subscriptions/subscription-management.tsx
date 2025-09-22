@@ -37,8 +37,6 @@ const SubscriptionManagementPage = () => {
     const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
     const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [syncMessage, setSyncMessage] = useState<string | null>(null);
-    const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
     const {
         data: customerPortalUrl,
@@ -100,16 +98,7 @@ const SubscriptionManagementPage = () => {
     // Get unified plans
     const unifiedPlans = getUnifiedPlans();
 
-    // Debug: log user data to console to help troubleshoot subscription status
-    console.log('🔍 Debug - Subscription data:', {
-        fromQuery: subscriptionData,
-        fromUser: user ? {
-            subscriptionStatus: (user as any)?.subscriptionStatus,
-            subscriptionPlan: (user as any)?.subscriptionPlan,
-            paymentProcessorUserId: (user as any)?.paymentProcessorUserId,
-        } : null,
-        final: subscription
-    });
+
 
     // Handle subscription purchase
     const handleSubscribeClick = async (planId: PaymentPlanId) => {
@@ -142,6 +131,34 @@ const SubscriptionManagementPage = () => {
         ? paymentPlans[subscription.subscriptionPlan as keyof typeof paymentPlans]
         : null;
 
+    // Get unified plan data for consistent pricing calculations
+    const currentUnifiedPlan = currentPlan && subscription?.subscriptionPlan
+        ? unifiedPlans.find(p => p.planId === subscription.subscriptionPlan)
+        : null;
+
+    // Detect billing cycle - determine if user is on annual or monthly subscription
+    // This is a simplified detection method - ideally this should be stored in the database
+    const detectBillingCycle = (): BillingCycle => {
+        if (!currentPlan || !currentUnifiedPlan || !subscription) return 'monthly';
+        
+        // If the plan has an annual price, check if current subscription matches annual pricing pattern
+        if (currentUnifiedPlan.annualPrice) {
+            // Heuristic: if subscription price suggests annual billing (typically larger amounts)
+            // This is imperfect - ideally billing cycle should be stored in subscription data
+            const annualMonthlyEquivalent = currentUnifiedPlan.annualPrice / 12;
+            const monthlyPrice = currentPlan.price;
+            
+            // If closer to annual equivalent price, likely annual billing
+            return Math.abs(currentPlan.price - annualMonthlyEquivalent) < Math.abs(currentPlan.price - monthlyPrice)
+                ? 'annual'
+                : 'monthly';
+        }
+        
+        return 'monthly';
+    };
+
+    const currentBillingCycle = detectBillingCycle();
+
     const getSubscriptionStatusBadge = () => {
         if (!subscription?.subscriptionStatus) {
             return <Badge variant="secondary">No Active Subscription</Badge>;
@@ -169,23 +186,6 @@ const SubscriptionManagementPage = () => {
     const handleManageBilling = () => {
         if (customerPortalUrl) {
             window.location.href = customerPortalUrl;
-        }
-    };
-
-    // Manual sync function (temporary debug feature)
-    const handleManualSync = async () => {
-        setIsSyncing(true);
-        setSyncMessage(null);
-        
-        try {
-            // For now, we'll just show debug info
-            // TODO: Implement actual sync when operation is available
-            setSyncMessage(`Debug info: User ID: ${user?.id}, Customer ID: ${subscription?.paymentProcessorUserId}`);
-            console.log('Current subscription data:', subscription);
-        } catch (error: any) {
-            setSyncMessage(`Error: ${error.message}`);
-        } finally {
-            setIsSyncing(false);
         }
     };
 
@@ -221,13 +221,27 @@ const SubscriptionManagementPage = () => {
                                     <div className="flex items-center gap-2">
                                         {isLaunchActive ? (
                                             <>
-                                                                                                        <p className="text-muted-foreground">${Math.round(currentPlan.price * (1 - discountPercent / 100))}/month</p>
+                                                <p className="text-muted-foreground">
+                                                    {currentUnifiedPlan 
+                                                        ? `$${formatPrice(
+                                                            calculatePlanPricing(currentUnifiedPlan, currentBillingCycle, true, discountPercent).displayPrice
+                                                          )}/${currentBillingCycle === 'annual' ? 'year' : 'month'}`
+                                                        : `$${Math.round(currentPlan.price * (1 - discountPercent / 100))}/month`
+                                                    }
+                                                </p>
                                                 <Badge className="text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white">
                                                     {discountPercent}% OFF
                                                 </Badge>
                                             </>
                                         ) : (
-                                            <p className="text-muted-foreground">${currentPlan.price}/month</p>
+                                            <p className="text-muted-foreground">
+                                                {currentUnifiedPlan 
+                                                    ? `$${formatPrice(
+                                                        calculatePlanPricing(currentUnifiedPlan, currentBillingCycle, false).displayPrice
+                                                      )}/${currentBillingCycle === 'annual' ? 'year' : 'month'}`
+                                                    : `$${currentPlan.price}/month`
+                                                }
+                                            </p>
                                         )}
                                     </div>
                                 </div>
@@ -315,35 +329,6 @@ const SubscriptionManagementPage = () => {
                             <div className="text-xs text-muted-foreground">
                                 Opens Stripe Customer Portal in a new window to manage payment methods,
                                 invoices, and subscription settings.
-                            </div>
-
-                            {/* Debug Section - Remove in production */}
-                            <div className="mt-4 p-3 bg-muted rounded-md">
-                                <h4 className="text-sm font-medium mb-2">Debug Information</h4>
-                                <div className="text-xs space-y-1">
-                                    <p><strong>User ID:</strong> {user?.id}</p>
-                                    <p><strong>Email:</strong> {user?.email}</p>
-                                    <p><strong>Customer ID:</strong> {subscription?.paymentProcessorUserId || 'None'}</p>
-                                    <p><strong>Subscription Status:</strong> {subscription?.subscriptionStatus || 'None'}</p>
-                                    <p><strong>Subscription Plan:</strong> {subscription?.subscriptionPlan || 'None'}</p>
-                                    <p><strong>Date Paid:</strong> {subscription?.datePaid ? new Date(subscription.datePaid).toLocaleDateString() : 'None'}</p>
-                                </div>
-                                
-                                <Button
-                                    onClick={handleManualSync}
-                                    disabled={isSyncing}
-                                    className="w-full mt-2"
-                                    variant="secondary"
-                                    size="sm"
-                                >
-                                    {isSyncing ? 'Checking...' : 'Refresh Subscription Data'}
-                                </Button>
-                                
-                                {syncMessage && (
-                                    <div className="mt-2 p-2 bg-background rounded text-xs">
-                                        {syncMessage}
-                                    </div>
-                                )}
                             </div>
                         </CardContent>
                     </Card>
