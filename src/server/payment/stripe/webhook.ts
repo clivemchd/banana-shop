@@ -2,6 +2,7 @@ import { stripe, getStripeWebhookSecret } from './stripe-client';
 import type { MiddlewareConfigFn } from 'wasp/server';
 import { HttpError } from 'wasp/server';
 import express from 'express';
+import { syncCreditsWithSubscription } from '../../credits/credits-operations';
 
 export const stripeWebhook = async (request: any, response: any, context: any) => {
   const body = request.body;
@@ -148,6 +149,16 @@ async function handleSubscriptionCreated(subscription: any, context: any) {
         subscriptionPlan: updatedUser?.subscriptionPlan,
         datePaid: updatedUser?.datePaid
       });
+
+      // Sync credits with the new subscription plan
+      if (updatedUser && updatedUser.subscriptionStatus === 'active' && updatedUser.subscriptionPlan) {
+        try {
+          const creditSync = await syncCreditsWithSubscription(updatedUser.id, context);
+          console.log('💳 Credits synced:', creditSync);
+        } catch (creditError) {
+          console.error('❌ Failed to sync credits:', creditError);
+        }
+      }
       
     } catch (error) {
       console.error('❌ Failed to update user subscription status:', error);
@@ -261,6 +272,23 @@ async function handleSubscriptionUpdated(subscription: any, context: any) {
         }
       });
       console.log(`✅ User subscription status updated to ${subscription.status}, affected rows:`, result.count);
+
+      // Sync credits if subscription is active
+      if (subscription.status === 'active') {
+        try {
+          // Find the user to sync credits
+          const user = await context.entities.Users.findFirst({
+            where: { paymentProcessorUserId: subscription.customer }
+          });
+          
+          if (user) {
+            const creditSync = await syncCreditsWithSubscription(user.id, context);
+            console.log('💳 Credits synced for updated subscription:', creditSync);
+          }
+        } catch (creditError) {
+          console.error('❌ Failed to sync credits on subscription update:', creditError);
+        }
+      }
     } catch (error) {
       console.error('❌ Failed to update user subscription status:', error);
     }

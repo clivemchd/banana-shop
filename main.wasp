@@ -89,11 +89,13 @@ page CheckoutPage {
 }
 
 query generateTextToImage {
-	fn: import { generateTextToImage } from "@src/server/fal-test"
+	fn: import { generateTextToImage } from "@src/server/image/image-operations",
+	entities: [Users]
 }
 
 query generateImageToImage {
-	fn: import { generateImageToImage } from "@src/server/fal-test"
+	fn: import { generateImageToImage } from "@src/server/image/image-operations",
+	entities: [Users]
 }
 
 // Payment operations
@@ -118,6 +120,36 @@ query getCurrentUserSubscription {
 
 action syncUserSubscription {
 	fn: import { syncUserSubscription } from "@src/server/payment/operations",
+	entities: [Users]
+}
+
+// Credits Management
+query getCurrentUserCredits {
+	fn: import { getCurrentUserCredits } from "@src/server/credits/credits-queries",
+	entities: [Users]
+}
+
+query checkUserCredits {
+	fn: import { checkUserCredits } from "@src/server/credits/credits-queries",
+	entities: [Users]
+}
+
+query getAllPlanCredits {
+	fn: import { getAllPlanCredits } from "@src/server/credits/credits-queries"
+}
+
+action consumeUserCredits {
+	fn: import { consumeUserCredits } from "@src/server/credits/credits-queries",
+	entities: [Users]
+}
+
+action syncUserCredits {
+	fn: import { syncUserCredits } from "@src/server/credits/credits-queries",
+	entities: [Users]
+}
+
+action addCreditsToUser {
+	fn: import { addCreditsToUser } from "@src/server/credits/credits-queries",
 	entities: [Users]
 }
 

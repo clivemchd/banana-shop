@@ -1,14 +1,14 @@
 import React from 'react';
 import { useAuth } from 'wasp/client/auth';
 import { useQuery } from 'wasp/client/operations';
-import { getCustomerPortalUrl, getCurrentUserSubscription, getLaunchSettings, generateCheckoutSession } from 'wasp/client/operations';
+import { getCustomerPortalUrl, getCurrentUserSubscription, getLaunchSettings, generateCheckoutSession, syncUserCredits } from 'wasp/client/operations';
 import { useNavigate } from 'react-router-dom';
 import { paymentPlans, PaymentPlanId, getSubscriptionPaymentPlanIds } from '../../../server/payment/plans';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { CreditCard, Calendar, Crown, Settings, ExternalLink, Check, X } from 'lucide-react';
+import { CreditCard, Calendar, Crown, Settings, ExternalLink, Check, X, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import Navbar from '../landing/navbar';
 import { 
@@ -37,6 +37,8 @@ const SubscriptionManagementPage = () => {
     const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
     const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isSyncingCredits, setIsSyncingCredits] = useState<boolean>(false);
+    const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
     const {
         data: customerPortalUrl,
@@ -189,6 +191,28 @@ const SubscriptionManagementPage = () => {
         }
     };
 
+    const handleSyncCredits = async () => {
+        setIsSyncingCredits(true);
+        setSyncMessage(null);
+
+        try {
+            const result = await syncUserCredits();
+            
+            if (result.success) {
+                setSyncMessage(`✅ Credits synced! New balance: ${result.newBalance} credits`);
+                // Refresh the page data to show updated credits
+                window.location.reload();
+            } else {
+                setSyncMessage(`ℹ️ Credits already synced. Current balance: ${result.newBalance} credits`);
+            }
+        } catch (error: any) {
+            console.error('Error syncing credits:', error);
+            setSyncMessage(`❌ Failed to sync credits: ${error.message}`);
+        } finally {
+            setIsSyncingCredits(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background">
             <Navbar />
@@ -203,13 +227,28 @@ const SubscriptionManagementPage = () => {
                 {/* Current Subscription Overview */}
                 <Card className="mb-8">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Crown className="h-5 w-5" />
-                            Current Subscription
-                        </CardTitle>
-                        <CardDescription>
-                            Your active plan and billing information
-                        </CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Crown className="h-5 w-5" />
+                                    Current Subscription
+                                </CardTitle>
+                                <CardDescription>
+                                    Your active plan and billing information
+                                </CardDescription>
+                            </div>
+                            {subscription?.subscriptionStatus === 'active' && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleSyncCredits}
+                                    disabled={isSyncingCredits}
+                                    className="h-8 px-2"
+                                >
+                                    <RefreshCw className={`h-4 w-4 ${isSyncingCredits ? 'animate-spin' : ''}`} />
+                                </Button>
+                            )}
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
@@ -260,6 +299,9 @@ const SubscriptionManagementPage = () => {
                                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                                     <p className="text-lg font-semibold">{subscription?.credits || 0}</p>
                                 </div>
+                                {syncMessage && (
+                                    <p className="text-xs text-muted-foreground">{syncMessage}</p>
+                                )}
                             </div>
 
                             {/* Next Billing Date */}
@@ -322,6 +364,34 @@ const SubscriptionManagementPage = () => {
                                 ) : (
                                     <p className="text-muted-foreground text-sm">No features available</p>
                                 )}
+
+                                {/* Credits Information */}
+                                <div className="mt-6 p-3 bg-accent/50 rounded-lg">
+                                    <h4 className="text-sm font-medium mb-2">Credit Usage</h4>
+                                    <div className="text-xs space-y-1 text-muted-foreground">
+                                        <p><strong>Current Balance:</strong> {subscription?.credits || 0} credits</p>
+                                        <p><strong>Image Generation:</strong> 0.5 credits each</p>
+                                        <p><strong>Image Editing:</strong> 1 credit each</p>
+                                        <p>Credits refresh with each billing cycle</p>
+                                    </div>
+                                    
+                                    <Button
+                                        onClick={handleSyncCredits}
+                                        disabled={isSyncingCredits}
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full mt-2"
+                                    >
+                                        <RefreshCw className={`h-4 w-4 mr-2 ${isSyncingCredits ? 'animate-spin' : ''}`} />
+                                        {isSyncingCredits ? 'Syncing...' : 'Sync Credits'}
+                                    </Button>
+
+                                    {syncMessage && (
+                                        <div className="mt-2 p-2 bg-background rounded text-xs">
+                                            {syncMessage}
+                                        </div>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     )}
