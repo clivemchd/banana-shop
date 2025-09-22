@@ -191,6 +191,34 @@ const SubscriptionManagementPage = () => {
         }
     };
 
+    // Helper function to get button text and variant for each plan
+    const getButtonConfig = (plan: any) => {
+        if (!subscription?.isSubscribed) {
+            return { text: 'Start Subscription', variant: 'default' as const, disabled: false };
+        }
+
+        if (subscription.subscriptionPlan === plan.planId) {
+            return { text: 'Current Plan', variant: 'outline' as const, disabled: true };
+        }
+
+        if (currentPlan) {
+            // Get the plan price from paymentPlans for comparison
+            const planPrice = paymentPlans[plan.planId as keyof typeof paymentPlans]?.price || 0;
+            const currentPrice = currentPlan.price;
+            
+            const isUpgrade = planPrice > currentPrice;
+            const isDowngrade = planPrice < currentPrice;
+            
+            if (isUpgrade) {
+                return { text: 'Upgrade', variant: 'default' as const, disabled: false };
+            } else if (isDowngrade) {
+                return { text: 'Downgrade', variant: 'secondary' as const, disabled: false };
+            }
+        }
+
+        return { text: 'Start Subscription', variant: 'default' as const, disabled: false };
+    };
+
     const handleSyncCredits = async () => {
         setIsSyncingCredits(true);
         setSyncMessage(null);
@@ -526,20 +554,19 @@ const SubscriptionManagementPage = () => {
                                             </div>
                                         </CardHeader>
                                         <CardContent className="pt-2">
-                                            {isCurrentPlan ? (
-                                                <Button variant="outline" className="w-full" disabled>
-                                                    Current Plan
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    onClick={() => handleSubscribeClick(plan.planId)}
-                                                    disabled={isPaymentLoading}
-                                                    variant={plan.isPopular ? "default" : "outline"}
-                                                    className="w-full"
-                                                >
-                                                    {isPaymentLoading ? 'Processing...' : 'Start Subscription'}
-                                                </Button>
-                                            )}
+                                            {(() => {
+                                                const buttonConfig = getButtonConfig(plan);
+                                                return (
+                                                    <Button
+                                                        onClick={() => handleSubscribeClick(plan.planId)}
+                                                        disabled={isPaymentLoading || buttonConfig.disabled}
+                                                        variant={buttonConfig.variant}
+                                                        className="w-full"
+                                                    >
+                                                        {isPaymentLoading ? 'Processing...' : buttonConfig.text}
+                                                    </Button>
+                                                );
+                                            })()}
                                         </CardContent>
                                     </Card>
                                 );
