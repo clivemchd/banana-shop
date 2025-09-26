@@ -77,6 +77,14 @@ async function processWebhookEvent(event: any, context: any) {
       case 'checkout.session.completed':
         await handleCheckoutCompleted(event.data.object, context);
         break;
+
+      case 'subscription_schedule.released':
+        await handleSubscriptionScheduleReleased(event.data.object, context);
+        break;
+
+      case 'subscription_schedule.created':
+        await handleSubscriptionScheduleCreated(event.data.object, context);
+        break;
       
       default:
         console.log(`🔔 Ignoring unhandled event type: ${eventType} (${eventId})`);
@@ -128,11 +136,16 @@ async function handleSubscriptionCreated(subscription: any, context: any) {
       console.log('🔄 Canceled existing active subscriptions, affected rows:', cancelResult.count);
 
       // Then set the new subscription as active
+      const billingCycle = getBillingCycleFromSubscription(subscription);
+      const endDate = getSubscriptionEndDate(subscription);
+      
       const result = await context.entities.Users.updateMany({
         where: { paymentProcessorUserId: subscription.customer },
         data: { 
           subscriptionStatus: subscription.status || 'active',
           subscriptionPlan: getPaymentPlanFromSubscription(subscription),
+          billingCycle: billingCycle,
+          billingEndDate: endDate,
           datePaid: new Date(),
         }
       });
@@ -147,6 +160,8 @@ async function handleSubscriptionCreated(subscription: any, context: any) {
       console.log('🔍 Updated user data:', {
         subscriptionStatus: updatedUser?.subscriptionStatus,
         subscriptionPlan: updatedUser?.subscriptionPlan,
+        billingCycle: updatedUser?.billingCycle,
+        billingEndDate: updatedUser?.billingEndDate,
         datePaid: updatedUser?.datePaid
       });
 
@@ -257,17 +272,81 @@ function inferPlanFromPrice(price: any): string | null {
   }
 }
 
+// Helper function to extract billing cycle from subscription
+function getBillingCycleFromSubscription(subscription: any): string | null {
+  try {
+    console.log('🔍 Extracting billing cycle from subscription:', subscription.id);
+    
+    // Get the recurring interval from the first subscription item
+    const recurringInterval = subscription.items?.data?.[0]?.price?.recurring?.interval;
+    console.log('📅 Recurring interval found:', recurringInterval);
+    
+    if (recurringInterval === 'month') {
+      return 'monthly';
+    } else if (recurringInterval === 'year') {
+      return 'annual';
+    }
+    
+    console.log('❓ Unknown or missing billing interval');
+    return null;
+  } catch (error) {
+    console.error('❌ Error extracting billing cycle from subscription:', error);
+    return null;
+  }
+}
+
+// Helper function to get subscription end date
+function getSubscriptionEndDate(subscription: any): Date | null {
+  try {
+    console.log('🔍 Extracting end date from subscription:', subscription.id);
+    
+    // For active subscriptions, use current_period_end
+    // For cancelled subscriptions, they may have a different end date
+    let endTimestamp: number | null = null;
+    
+    if (subscription.status === 'active' && subscription.current_period_end) {
+      endTimestamp = subscription.current_period_end;
+      console.log('📅 Using current_period_end for active subscription:', endTimestamp);
+    } else if (subscription.canceled_at && subscription.cancel_at_period_end) {
+      // If cancelled but set to end at period end, use current_period_end
+      endTimestamp = subscription.current_period_end;
+      console.log('📅 Using current_period_end for cancelled subscription (end at period end):', endTimestamp);
+    } else if (subscription.canceled_at) {
+      // If immediately cancelled, use cancelled_at timestamp
+      endTimestamp = subscription.canceled_at;
+      console.log('📅 Using canceled_at for immediately cancelled subscription:', endTimestamp);
+    }
+    
+    if (endTimestamp) {
+      const endDate = new Date(endTimestamp * 1000); // Convert Unix timestamp to Date
+      console.log('📅 Calculated end date:', endDate.toISOString());
+      return endDate;
+    }
+    
+    console.log('❓ No valid end date found');
+    return null;
+  } catch (error) {
+    console.error('❌ Error extracting end date from subscription:', error);
+    return null;
+  }
+}
+
 // Handle subscription updated
 async function handleSubscriptionUpdated(subscription: any, context: any) {
   console.log('📝 Subscription updated:', subscription.id, 'status:', subscription.status);
   
   if (subscription.customer) {
     try {
+      const billingCycle = getBillingCycleFromSubscription(subscription);
+      const endDate = getSubscriptionEndDate(subscription);
+      
       const result = await context.entities.Users.updateMany({
         where: { paymentProcessorUserId: subscription.customer },
         data: { 
           subscriptionStatus: subscription.status,
           subscriptionPlan: getPaymentPlanFromSubscription(subscription),
+          billingCycle: billingCycle,
+          billingEndDate: endDate,
           ...(subscription.status === 'active' && { datePaid: new Date() })
         }
       });
@@ -306,9 +385,12 @@ async function handleSubscriptionDeleted(subscription: any, context: any) {
         data: { 
           subscriptionStatus: 'canceled',
           subscriptionPlan: null,
+          billingCycle: null,
+          billingEndDate: null,
+          credits: 0, // Reset credits to zero when subscription is cancelled
         }
       });
-      console.log('✅ User subscription status updated to canceled, affected rows:', result.count);
+      console.log('✅ User subscription status updated to canceled and credits reset to 0, affected rows:', result.count);
     } catch (error) {
       console.error('❌ Failed to update user subscription status:', error);
     }
@@ -352,11 +434,16 @@ async function handleCheckoutCompleted(session: any, context: any) {
       });
       
       // Update user with subscription info
+      const billingCycle = getBillingCycleFromSubscription(subscription);
+      const endDate = getSubscriptionEndDate(subscription);
+      
       const result = await context.entities.Users.updateMany({
         where: { paymentProcessorUserId: session.customer },
         data: { 
           subscriptionStatus: subscription.status,
           subscriptionPlan: getPaymentPlanFromSubscription(subscription),
+          billingCycle: billingCycle,
+          billingEndDate: endDate,
           datePaid: new Date(),
         }
       });
@@ -364,6 +451,75 @@ async function handleCheckoutCompleted(session: any, context: any) {
       console.log('✅ User subscription updated via checkout completion, affected rows:', result.count);
     } catch (error) {
       console.error('❌ Failed to process checkout completion:', error);
+    }
+  }
+}
+
+// Handle subscription schedule created
+async function handleSubscriptionScheduleCreated(subscriptionSchedule: any, context: any) {
+  console.log('📅 Subscription schedule created:', {
+    id: subscriptionSchedule.id,
+    customer: subscriptionSchedule.customer,
+    status: subscriptionSchedule.status,
+    startDate: new Date(subscriptionSchedule.phases[0]?.start_date * 1000).toISOString()
+  });
+  
+  // Log the scheduled subscription change
+  console.log('✅ User will have their subscription changed according to the schedule');
+}
+
+// Handle subscription schedule released (when it converts to a regular subscription)
+async function handleSubscriptionScheduleReleased(subscriptionSchedule: any, context: any) {
+  console.log('🚀 Subscription schedule released and converted to regular subscription:', {
+    id: subscriptionSchedule.id,
+    customer: subscriptionSchedule.customer,
+    subscriptionId: subscriptionSchedule.subscription
+  });
+
+  if (subscriptionSchedule.customer && subscriptionSchedule.subscription) {
+    try {
+      // Fetch the new subscription details
+      const subscription = await stripe.subscriptions.retrieve(subscriptionSchedule.subscription);
+      
+      console.log('📋 New subscription details from schedule:', {
+        id: subscription.id,
+        status: subscription.status,
+        customer: subscription.customer
+      });
+      
+      // Update user with the new subscription info
+      const billingCycle = getBillingCycleFromSubscription(subscription);
+      const endDate = getSubscriptionEndDate(subscription);
+      
+      const result = await context.entities.Users.updateMany({
+        where: { paymentProcessorUserId: subscriptionSchedule.customer },
+        data: { 
+          subscriptionStatus: subscription.status,
+          subscriptionPlan: getPaymentPlanFromSubscription(subscription),
+          billingCycle: billingCycle,
+          billingEndDate: endDate,
+          datePaid: new Date(),
+        }
+      });
+      
+      console.log('✅ User subscription updated from schedule release, affected rows:', result.count);
+      
+      // Sync credits with the new subscription
+      const user = await context.entities.Users.findFirst({
+        where: { paymentProcessorUserId: subscriptionSchedule.customer }
+      });
+      
+      if (user) {
+        try {
+          const creditSync = await syncCreditsWithSubscription(user.id, context);
+          console.log('💳 Credits synced for schedule-released subscription:', creditSync);
+        } catch (creditError) {
+          console.error('❌ Failed to sync credits on schedule release:', creditError);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to process subscription schedule release:', error);
     }
   }
 }

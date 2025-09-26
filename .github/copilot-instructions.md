@@ -10,3 +10,5 @@ Rules of the project:
 7. Always add proper enums do not add any or unknow. Do not do tyoe assertions without permission
 8. Do not run wasp start 
 9. Do not use require to load modules
+10. never use as any type assertion
+

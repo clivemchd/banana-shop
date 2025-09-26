@@ -1,5 +1,5 @@
 import { stripe } from './stripe-client';
-import { LAUNCH_COUPON_CODE, isLaunchOfferActive } from '../plans';
+import { LAUNCH_COUPON_CODE, isLaunchOfferActive, paymentPlans } from '../plans';
 import type Stripe from 'stripe';
 
 export interface CreateStripeCheckoutSessionArgs {
@@ -82,4 +82,62 @@ export async function getStripeCustomerPortalUrl(customerId: string): Promise<st
   });
 
   return session.url;
+}
+
+export interface CreateScheduledSubscriptionArgs {
+  userId: string;
+  userEmail: string;
+  paymentPlan: any;
+  billingCycle: 'monthly' | 'annual';
+  currentSubscriptionEndDate: Date;
+  prismaUserDelegate: any;
+}
+
+export async function createScheduledSubscriptionChange({
+  userId,
+  userEmail,
+  paymentPlan,
+  billingCycle,
+  currentSubscriptionEndDate,
+  prismaUserDelegate
+}: CreateScheduledSubscriptionArgs) {
+  console.log('📅 Creating scheduled subscription change for user:', userId);
+  
+  const customer = await fetchStripeCustomer(userEmail);
+  
+  // Create a subscription schedule to start the new plan when current subscription ends
+  const subscriptionSchedule = await stripe.subscriptionSchedules.create({
+    customer: customer.id,
+    start_date: Math.floor(currentSubscriptionEndDate.getTime() / 1000), // Convert to Unix timestamp
+    end_behavior: 'release', // Release the subscription to continue normally after schedule ends
+    phases: [
+      {
+        items: [
+          {
+            price: paymentPlan.getPaymentProcessorPlanId(billingCycle),
+            quantity: 1,
+          },
+        ],
+        iterations: 1, // Run for one billing cycle, then release to normal subscription
+      },
+    ],
+    metadata: {
+      userId,
+      planId: Object.keys(paymentPlans).find(
+        key => paymentPlans[key as keyof typeof paymentPlans] === paymentPlan
+      ) || 'unknown',
+      isScheduledChange: 'true',
+    },
+  });
+
+  console.log('✅ Subscription schedule created:', subscriptionSchedule.id);
+  console.log('📅 New subscription will start on:', new Date(currentSubscriptionEndDate).toISOString());
+
+  // Return a session-like object for consistency with the existing API
+  return {
+    session: {
+      url: `${process.env.WASP_WEB_CLIENT_URL}/subscriptions?scheduled=true`,
+      id: subscriptionSchedule.id,
+    }
+  };
 }

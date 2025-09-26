@@ -31,7 +31,7 @@
     "db:stop": "bash ./bash/db-stop.sh",
     "dev:dbm": "bash ./bash/db-migrate-dev.sh",
     "db:preview": "wasp db studio",
-    "dev:stripe:listen": "stripe listen --forward-to http://localhost:3001/payments-webhook"
+    "dev:stripe": "stripe listen --forward-to http://localhost:3001/payments-webhook"
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",

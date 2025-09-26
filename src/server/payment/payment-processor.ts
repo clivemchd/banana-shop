@@ -6,6 +6,9 @@ export interface CreateCheckoutSessionArgs {
   userEmail: string;
   paymentPlan: PaymentPlan;
   billingCycle?: 'monthly' | 'annual';
+  isSubscriptionChange?: boolean;
+  successUrl?: string;
+  cancelUrl?: string;
   prismaUserDelegate: PrismaClient['users'];
 }
 

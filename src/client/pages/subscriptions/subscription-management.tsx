@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from 'wasp/client/auth';
 import { useQuery } from 'wasp/client/operations';
 import { getCustomerPortalUrl, getCurrentUserSubscription, getLaunchSettings, generateCheckoutSession, syncUserCredits } from 'wasp/client/operations';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paymentPlans, PaymentPlanId, getSubscriptionPaymentPlanIds } from '../../../server/payment/plans';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
+import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { CreditCard, Calendar, Crown, Settings, ExternalLink, Check, X, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { CreditCard, Calendar, Crown, Settings, ExternalLink, Check, X, RefreshCw, AlertTriangle } from 'lucide-react';
 import Navbar from '../landing/navbar';
 import { 
     getUnifiedPlans, 
@@ -29,6 +30,8 @@ type UserSubscriptionInfo = {
     datePaid: Date | null;
     credits: number;
     paymentProcessorUserId: string | null;
+    billingCycle: string | null;
+    endDate: Date | null;
 };
 
 const SubscriptionManagementPage = () => {
@@ -39,6 +42,10 @@ const SubscriptionManagementPage = () => {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isSyncingCredits, setIsSyncingCredits] = useState<boolean>(false);
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
+    const [showDowngradeModal, setShowDowngradeModal] = useState<boolean>(false);
+    const [pendingPlanId, setPendingPlanId] = useState<PaymentPlanId | null>(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [showScheduledMessage, setShowScheduledMessage] = useState<boolean>(false);
 
     const {
         data: customerPortalUrl,
@@ -57,6 +64,42 @@ const SubscriptionManagementPage = () => {
         isLoading: launchLoading,
         error: launchError
     } = useQuery(getLaunchSettings);
+
+    // Check for URL parameters (scheduled, success, canceled)
+    useEffect(() => {
+        const scheduled = searchParams.get('scheduled');
+        const success = searchParams.get('success');
+        const canceled = searchParams.get('canceled');
+        
+        if (scheduled === 'true') {
+            setShowScheduledMessage(true);
+            // Hide message after 10 seconds
+            setTimeout(() => {
+                setShowScheduledMessage(false);
+            }, 10000);
+        }
+        
+        // Remove all parameters from URL to prevent showing messages on refresh
+        const newSearchParams = new URLSearchParams(searchParams);
+        let shouldUpdate = false;
+        
+        if (scheduled) {
+            newSearchParams.delete('scheduled');
+            shouldUpdate = true;
+        }
+        if (success) {
+            newSearchParams.delete('success');
+            shouldUpdate = true;
+        }
+        if (canceled) {
+            newSearchParams.delete('canceled');
+            shouldUpdate = true;
+        }
+        
+        if (shouldUpdate) {
+            setSearchParams(newSearchParams);
+        }
+    }, [searchParams, setSearchParams]);
 
     // Redirect to login if not authenticated
     if (!user) {
@@ -81,13 +124,24 @@ const SubscriptionManagementPage = () => {
     }
 
     // Use the subscription data from the query if available, otherwise fall back to user data
-    const subscription: UserSubscriptionInfo | null = subscriptionData || (user ? {
+    const subscription: UserSubscriptionInfo | null = subscriptionData ? {
+        isSubscribed: subscriptionData.isSubscribed,
+        subscriptionStatus: subscriptionData.subscriptionStatus,
+        subscriptionPlan: subscriptionData.subscriptionPlan,
+        datePaid: subscriptionData.datePaid,
+        credits: subscriptionData.credits,
+        paymentProcessorUserId: subscriptionData.paymentProcessorUserId,
+        billingCycle: (subscriptionData as any).billingCycle || null,
+        endDate: (subscriptionData as any).billingEndDate || null,
+    } : (user ? {
         isSubscribed: (user as any).subscriptionStatus === 'active',
         subscriptionStatus: (user as any).subscriptionStatus || null,
         subscriptionPlan: (user as any).subscriptionPlan || null,
         datePaid: (user as any).datePaid || null,
         credits: (user as any).credits || 0,
         paymentProcessorUserId: (user as any).paymentProcessorUserId || null,
+        billingCycle: (user as any).billingCycle || null,
+        endDate: (user as any).billingEndDate || null,
     } : null);
 
     // Check if launch offer is active from server data
@@ -102,20 +156,43 @@ const SubscriptionManagementPage = () => {
 
 
 
-    // Handle subscription purchase
+    // Handle subscription purchase or plan change
     const handleSubscribeClick = async (planId: PaymentPlanId) => {
         if (!user) {
             navigate('/signin');
             return;
         }
 
+        // Check if this is a downgrade
+        if (currentPlan && subscription?.isSubscribed) {
+            const newPlanPrice = paymentPlans[planId as keyof typeof paymentPlans]?.price || 0;
+            const currentPrice = currentPlan.price;
+            
+            if (newPlanPrice < currentPrice) {
+                // Show confirmation modal for downgrades
+                setPendingPlanId(planId);
+                setShowDowngradeModal(true);
+                return;
+            }
+        }
+
+        // Proceed with plan change
+        await processPlanChange(planId);
+    };
+
+    const processPlanChange = async (planId: PaymentPlanId) => {
         try {
             setIsPaymentLoading(true);
             setErrorMessage(null);
             
+            // Check if user has existing subscription
+            const isUpgradeOrSwitch = Boolean(subscription?.isSubscribed && currentPlan);
+            
             const { sessionUrl } = await generateCheckoutSession({
                 paymentPlanId: planId,
-                billingCycle: billingCycle
+                billingCycle: billingCycle,
+                // Add parameter to indicate this is a plan change (will be handled by backend)
+                isSubscriptionChange: isUpgradeOrSwitch
             });
             
             if (sessionUrl) {
@@ -133,33 +210,40 @@ const SubscriptionManagementPage = () => {
         ? paymentPlans[subscription.subscriptionPlan as keyof typeof paymentPlans]
         : null;
 
+    // Get billing cycle from stored database value - always use database as source of truth
+    const getCurrentBillingCycle = (): BillingCycle => {
+        if (!subscription?.billingCycle) return 'monthly';
+        
+        // Normalize the stored billing cycle to match our BillingCycle type
+        return subscription.billingCycle === 'annual' ? 'annual' : 'monthly';
+    };
+
     // Get unified plan data for consistent pricing calculations
     const currentUnifiedPlan = currentPlan && subscription?.subscriptionPlan
         ? unifiedPlans.find(p => p.planId === subscription.subscriptionPlan)
         : null;
 
-    // Detect billing cycle - determine if user is on annual or monthly subscription
-    // This is a simplified detection method - ideally this should be stored in the database
-    const detectBillingCycle = (): BillingCycle => {
-        if (!currentPlan || !currentUnifiedPlan || !subscription) return 'monthly';
-        
-        // If the plan has an annual price, check if current subscription matches annual pricing pattern
-        if (currentUnifiedPlan.annualPrice) {
-            // Heuristic: if subscription price suggests annual billing (typically larger amounts)
-            // This is imperfect - ideally billing cycle should be stored in subscription data
-            const annualMonthlyEquivalent = currentUnifiedPlan.annualPrice / 12;
-            const monthlyPrice = currentPlan.price;
-            
-            // If closer to annual equivalent price, likely annual billing
-            return Math.abs(currentPlan.price - annualMonthlyEquivalent) < Math.abs(currentPlan.price - monthlyPrice)
-                ? 'annual'
-                : 'monthly';
-        }
-        
-        return 'monthly';
-    };
+    // Debug: Log the values to help troubleshoot
+    if (currentPlan && subscription?.subscriptionPlan && !currentUnifiedPlan) {
+        console.log('DEBUG: Could not find unified plan', {
+            subscriptionPlan: subscription.subscriptionPlan,
+            availableUnifiedPlans: unifiedPlans.map(p => p.planId),
+            currentBillingCycle: getCurrentBillingCycle()
+        });
+    }
 
-    const currentBillingCycle = detectBillingCycle();
+    // Debug: Log subscription data to troubleshoot billing cycle and end date
+    if (subscription) {
+        console.log('DEBUG: Subscription data', {
+            billingCycle: subscription.billingCycle,
+            endDate: subscription.endDate,
+            datePaid: subscription.datePaid,
+            subscriptionStatus: subscription.subscriptionStatus,
+            calculatedBillingCycle: getCurrentBillingCycle()
+        });
+    }
+
+    const currentBillingCycle = getCurrentBillingCycle();
 
     const getSubscriptionStatusBadge = () => {
         if (!subscription?.subscriptionStatus) {
@@ -210,13 +294,26 @@ const SubscriptionManagementPage = () => {
             const isDowngrade = planPrice < currentPrice;
             
             if (isUpgrade) {
-                return { text: 'Upgrade', variant: 'default' as const, disabled: false };
+                return { text: 'Upgrade Now', variant: 'default' as const, disabled: false };
             } else if (isDowngrade) {
-                return { text: 'Downgrade', variant: 'secondary' as const, disabled: false };
+                return { text: 'Downgrade Plan', variant: 'secondary' as const, disabled: false };
             }
         }
 
         return { text: 'Start Subscription', variant: 'default' as const, disabled: false };
+    };
+
+    const handleDowngradeConfirm = async () => {
+        setShowDowngradeModal(false);
+        if (pendingPlanId) {
+            await processPlanChange(pendingPlanId);
+        }
+        setPendingPlanId(null);
+    };
+
+    const handleDowngradeCancel = () => {
+        setShowDowngradeModal(false);
+        setPendingPlanId(null);
     };
 
     const handleSyncCredits = async () => {
@@ -251,6 +348,17 @@ const SubscriptionManagementPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Subscription Management</h1>
                     <p className="text-muted-foreground mt-2">Manage your subscription and billing preferences</p>
                 </div>
+
+                {/* Scheduled Subscription Change Alert */}
+                {showScheduledMessage && (
+                    <Alert className="mb-8 border-green-200 bg-green-50">
+                        <Check className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-800">
+                            <strong>Subscription Change Scheduled!</strong> Your new plan will start when your current billing cycle ends. 
+                            You can continue using your current plan until then.
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 {/* Current Subscription Overview */}
                 <Card className="mb-8">
@@ -290,10 +398,17 @@ const SubscriptionManagementPage = () => {
                                             <>
                                                 <p className="text-muted-foreground">
                                                     {currentUnifiedPlan 
-                                                        ? `$${formatPrice(
-                                                            calculatePlanPricing(currentUnifiedPlan, currentBillingCycle, true, discountPercent).displayPrice
-                                                          )}/${currentBillingCycle === 'annual' ? 'year' : 'month'}`
-                                                        : `$${Math.round(currentPlan.price * (1 - discountPercent / 100))}/month`
+                                                        ? (() => {
+                                                            const pricing = calculatePlanPricing(currentUnifiedPlan, currentBillingCycle, true, discountPercent);
+                                                            // For annual billing, show the full annual price (multiply monthly by 12)
+                                                            const displayAmount = currentBillingCycle === 'annual' 
+                                                                ? pricing.displayPrice * 12 
+                                                                : pricing.displayPrice;
+                                                            return `$${formatPrice(displayAmount)}/${currentBillingCycle === 'annual' ? 'year' : 'month'}`;
+                                                          })()
+                                                        : currentBillingCycle === 'annual'
+                                                            ? `$${formatPrice(currentPlan.price * 12 * (1 - discountPercent / 100))}/year`
+                                                            : `$${formatPrice(currentPlan.price * (1 - discountPercent / 100))}/month`
                                                     }
                                                 </p>
                                                 <Badge className="text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white">
@@ -303,10 +418,17 @@ const SubscriptionManagementPage = () => {
                                         ) : (
                                             <p className="text-muted-foreground">
                                                 {currentUnifiedPlan 
-                                                    ? `$${formatPrice(
-                                                        calculatePlanPricing(currentUnifiedPlan, currentBillingCycle, false).displayPrice
-                                                      )}/${currentBillingCycle === 'annual' ? 'year' : 'month'}`
-                                                    : `$${currentPlan.price}/month`
+                                                    ? (() => {
+                                                        const pricing = calculatePlanPricing(currentUnifiedPlan, currentBillingCycle, false);
+                                                        // For annual billing, show the full annual price (multiply monthly by 12)
+                                                        const displayAmount = currentBillingCycle === 'annual' 
+                                                            ? pricing.displayPrice * 12 
+                                                            : pricing.displayPrice;
+                                                        return `$${formatPrice(displayAmount)}/${currentBillingCycle === 'annual' ? 'year' : 'month'}`;
+                                                      })()
+                                                    : currentBillingCycle === 'annual'
+                                                        ? `$${formatPrice(currentPlan.price * 12)}/year`
+                                                        : `$${formatPrice(currentPlan.price)}/month`
                                                 }
                                             </p>
                                         )}
@@ -340,9 +462,14 @@ const SubscriptionManagementPage = () => {
                                         <Calendar className="h-4 w-4 text-muted-foreground" />
                                         <p>
                                             {(() => {
+                                                // Use stored endDate if available, otherwise calculate from last payment
+                                                if (subscription.endDate) {
+                                                    return new Date(subscription.endDate).toLocaleDateString();
+                                                }
+                                                
+                                                // Fallback to calculation based on last payment and billing cycle
                                                 const lastPayment = new Date(subscription.datePaid);
                                                 const nextBilling = new Date(lastPayment);
-                                                // Assume monthly billing by default, adjust based on detected cycle
                                                 nextBilling.setMonth(nextBilling.getMonth() + (currentBillingCycle === 'annual' ? 12 : 1));
                                                 return nextBilling.toLocaleDateString();
                                             })()}
@@ -438,23 +565,25 @@ const SubscriptionManagementPage = () => {
                         <CardContent className="space-y-4">
                             <Button
                                 onClick={handleManageBilling}
-                                disabled={portalLoading || !customerPortalUrl}
+                                disabled={portalLoading || !customerPortalUrl || subscription?.subscriptionStatus === 'canceled'}
                                 className="w-full"
                                 variant="outline"
                             >
                                 <ExternalLink className="h-4 w-4 mr-2" />
-                                {portalLoading ? 'Loading...' : 'Open Billing Portal'}
+                                {portalLoading ? 'Loading...' : subscription?.subscriptionStatus === 'canceled' ? 'Billing Unavailable' : 'Open Billing Portal'}
                             </Button>
 
-                            {portalError && (
+                            {portalError && subscription?.subscriptionStatus !== 'canceled' && (
                                 <p className="text-sm text-destructive">
                                     Error loading billing portal. Please try again.
                                 </p>
                             )}
 
                             <div className="text-xs text-muted-foreground">
-                                Opens Stripe Customer Portal in a new window to manage payment methods,
-                                invoices, and subscription settings.
+                                {subscription?.subscriptionStatus === 'canceled' 
+                                    ? 'Billing portal is not available for cancelled subscriptions.'
+                                    : 'Opens Stripe Customer Portal in a new window to manage payment methods, invoices, and subscription settings.'
+                                }
                             </div>
                         </CardContent>
                     </Card>
@@ -675,6 +804,104 @@ const SubscriptionManagementPage = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Downgrade Confirmation Modal */}
+            <Dialog open={showDowngradeModal} onOpenChange={setShowDowngradeModal}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            Confirm Plan Downgrade
+                        </DialogTitle>
+                        <DialogDescription>
+                            You're about to downgrade your subscription. Please review what will change.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="py-4">
+                        {pendingPlanId && currentPlan && (
+                            <div className="space-y-4">
+                                {/* Current vs New Plan Comparison */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium text-sm">Current Plan</h4>
+                                        <div className="p-3 border rounded-lg bg-green-50">
+                                            <p className="font-semibold">{currentPlan.name}</p>
+                                            <p className="text-sm text-muted-foreground">${currentPlan.price}/month</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium text-sm">New Plan</h4>
+                                        <div className="p-3 border rounded-lg">
+                                            <p className="font-semibold">{paymentPlans[pendingPlanId as keyof typeof paymentPlans]?.name}</p>
+                                            <p className="text-sm text-muted-foreground">${paymentPlans[pendingPlanId as keyof typeof paymentPlans]?.price}/month</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* What Changes */}
+                                <div className="space-y-3">
+                                    <h4 className="font-medium text-sm">What will change:</h4>
+                                    <div className="space-y-2">
+                                        {(() => {
+                                            const newPlan = paymentPlans[pendingPlanId as keyof typeof paymentPlans];
+                                            const currentFeatures = currentPlan.features || [];
+                                            const newFeatures = newPlan?.features || [];
+                                            
+                                            const lostFeatures = currentFeatures.filter(feature => !newFeatures.includes(feature));
+                                            
+                                            return (
+                                                <>
+                                                    {lostFeatures.length > 0 && (
+                                                        <div className="p-3 bg-red-50 rounded-lg">
+                                                            <p className="text-sm font-medium text-red-800 mb-2">You will lose:</p>
+                                                            <ul className="text-sm text-red-700 space-y-1">
+                                                                {lostFeatures.map((feature, index) => (
+                                                                    <li key={index} className="flex items-center gap-2">
+                                                                        <X className="h-3 w-3" />
+                                                                        {feature}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    <div className="p-3 bg-blue-50 rounded-lg">
+                                                        <p className="text-sm text-blue-800">
+                                                            <strong>Important:</strong> Your downgrade will be scheduled for the end of your current billing cycle
+                                                            {subscription?.datePaid && (
+                                                                <span>
+                                                                    {' '}(approximately{' '}
+                                                                    {(() => {
+                                                                        const lastPayment = new Date(subscription.datePaid);
+                                                                        const nextBilling = new Date(lastPayment);
+                                                                        nextBilling.setMonth(nextBilling.getMonth() + 1);
+                                                                        return nextBilling.toLocaleDateString();
+                                                                    })()})
+                                                                </span>
+                                                            )}
+                                                            . You'll continue to have access to all your current plan features until then.
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={handleDowngradeCancel}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleDowngradeConfirm} disabled={isPaymentLoading}>
+                            {isPaymentLoading ? 'Processing...' : 'Confirm Downgrade'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

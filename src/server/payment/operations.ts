@@ -10,12 +10,13 @@ export type CheckoutSession = {
 export type CheckoutSessionArgs = {
   paymentPlanId: PaymentPlanId;
   billingCycle?: 'monthly' | 'annual';
+  isSubscriptionChange?: boolean;
 };
 
 export const generateCheckoutSession = async (args: CheckoutSessionArgs | PaymentPlanId, context: any) => {
   // Handle backward compatibility - if args is just a PaymentPlanId
-  const { paymentPlanId, billingCycle = 'monthly' } = typeof args === 'string' 
-    ? { paymentPlanId: args, billingCycle: 'monthly' as const }
+  const { paymentPlanId, billingCycle = 'monthly', isSubscriptionChange = false } = typeof args === 'string' 
+    ? { paymentPlanId: args, billingCycle: 'monthly' as const, isSubscriptionChange: false }
     : args;
   
   console.log('🚀 Generating checkout session for plan:', paymentPlanId, 'billing cycle:', billingCycle);
@@ -55,6 +56,7 @@ export const generateCheckoutSession = async (args: CheckoutSessionArgs | Paymen
       userEmail,
       paymentPlan,
       billingCycle,
+      isSubscriptionChange,
       prismaUserDelegate: context.entities.Users,
     });
 
@@ -117,6 +119,8 @@ export const getCurrentUserSubscription = async (_args: any, context: any) => {
       paymentProcessorUserId: true,
       datePaid: true,
       credits: true,
+      billingCycle: true,
+      billingEndDate: true,
     },
   });
 
@@ -131,6 +135,8 @@ export const getCurrentUserSubscription = async (_args: any, context: any) => {
     datePaid: user.datePaid,
     credits: user.credits,
     paymentProcessorUserId: user.paymentProcessorUserId,
+    billingCycle: user.billingCycle,
+    billingEndDate: user.billingEndDate,
   };
 };
 

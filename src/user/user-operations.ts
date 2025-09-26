@@ -9,6 +9,8 @@ export type UserSubscriptionInfo = {
   datePaid: Date | null;
   credits: number;
   paymentProcessorUserId: string | null;
+  billingCycle: string | null;
+  billingEndDate: Date | null;
 };
 
 export const getCurrentUserSubscription = async (_args: any, context: any): Promise<UserSubscriptionInfo> => {
@@ -24,6 +26,8 @@ export const getCurrentUserSubscription = async (_args: any, context: any): Prom
       datePaid: true,
       credits: true,
       paymentProcessorUserId: true,
+      billingCycle: true,
+      billingEndDate: true,
     },
   });
 
@@ -38,5 +42,7 @@ export const getCurrentUserSubscription = async (_args: any, context: any): Prom
     datePaid: user.datePaid,
     credits: user.credits || 0,
     paymentProcessorUserId: user.paymentProcessorUserId,
+    billingCycle: user.billingCycle,
+    billingEndDate: user.billingEndDate,
   };
 };

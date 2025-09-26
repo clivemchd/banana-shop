@@ -92,7 +92,7 @@ export const paymentPlans: Record<PaymentPlanId, PaymentPlan> = {
     annualPrice: 182,
     description: 'For hobbyists and regular users.',
     features: [
-      '360 image generations',
+      '360 image generations per month',
       '180 image edits per month',
       'Faster processing',
       'Email support'
