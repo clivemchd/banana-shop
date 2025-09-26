@@ -84,10 +84,15 @@ const Pricing = () => {
 			setIsPaymentLoading(planId);
 			setErrorMessage(null);
 			
+			// Check if user has existing subscription
+			const isUpgradeOrSwitch = Boolean(currentSubscription?.isSubscribed && currentPlan);
+			
 			// Generate checkout session with billing cycle
 			const { sessionUrl } = await generateCheckoutSession({
 				paymentPlanId: planId,
-				billingCycle: billingCycle
+				billingCycle: billingCycle,
+				// Add parameter to indicate this is a plan change (will be handled by backend)
+				isSubscriptionChange: isUpgradeOrSwitch
 			});
 			
 			if (sessionUrl) {
@@ -260,7 +265,7 @@ const Pricing = () => {
 									return (
 										<Button
 											onClick={() => handleGetStarted(plan.planId)}
-											disabled={isPaymentLoading === plan.planId || buttonConfig.disabled}
+											disabled={isPaymentLoading !== null || buttonConfig.disabled}
 											className={`w-full py-2 rounded-md ${buttonConfig.style}`}
 										>
 											{isPaymentLoading === plan.planId ? 'Processing...' : buttonConfig.text}

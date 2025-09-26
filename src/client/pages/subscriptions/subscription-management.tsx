@@ -63,11 +63,12 @@ const SubscriptionManagementPage = () => {
         error: launchError
     } = useQuery(getLaunchSettings);
 
-    // Check for URL parameters (scheduled, success, canceled)
+    // Check for URL parameters (scheduled, success, canceled, upgraded)
     useEffect(() => {
         const scheduled = searchParams.get('scheduled');
         const success = searchParams.get('success');
         const canceled = searchParams.get('canceled');
+        const upgraded = searchParams.get('upgraded');
 
         if (scheduled === 'true') {
             setShowScheduledMessage(true);
@@ -75,6 +76,14 @@ const SubscriptionManagementPage = () => {
             setTimeout(() => {
                 setShowScheduledMessage(false);
             }, 10000);
+        }
+
+        if (success === 'true' && upgraded === 'true') {
+            // Show upgrade success message
+            setTimeout(() => {
+                // Refresh the page to show updated subscription data
+                window.location.reload();
+            }, 1000);
         }
 
         // Remove all parameters from URL to prevent showing messages on refresh
@@ -91,6 +100,10 @@ const SubscriptionManagementPage = () => {
         }
         if (canceled) {
             newSearchParams.delete('canceled');
+            shouldUpdate = true;
+        }
+        if (upgraded) {
+            newSearchParams.delete('upgraded');
             shouldUpdate = true;
         }
 
