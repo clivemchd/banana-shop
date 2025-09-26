@@ -31,15 +31,22 @@
     "db:stop": "bash ./bash/db-stop.sh",
     "dev:dbm": "bash ./bash/db-migrate-dev.sh",
     "db:preview": "wasp db studio",
-    "dev:stripe": "stripe listen --forward-to http://localhost:3001/payments-webhook"
+    "dev:stripe": "stripe listen --forward-to http://localhost:3001/payments-webhook",
+    "test:client": "wasp test client",
+    "test:client:run": "wasp test client run",
+    "test:client:ui": "wasp test client --ui"
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^18.0.37",
     "eslint": "^9.27.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.1.0",
+    "jsdom": "^27.0.0",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "prisma": "5.19.1",
@@ -47,6 +54,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "5.8.2",
     "typescript-eslint": "^8.32.1",
-    "vite": "^4.3.9"
+    "vite": "^4.3.9",
+    "vitest": "^1.6.1"
   }
 }

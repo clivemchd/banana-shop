@@ -52,7 +52,7 @@ const BillingManagementCard: React.FC<BillingManagementCardProps> = ({
                 <div className="text-xs text-muted-foreground">
                     {subscription?.subscriptionStatus === 'canceled'
                         ? 'Billing portal is not available for cancelled subscriptions.'
-                        : 'Opens Stripe Customer Portal in a new window to manage payment methods, invoices, and subscription settings.'
+                        : 'Opens Stripe Customer Portal to manage payment methods, invoices, and subscription settings.'
                     }
                 </div>
             </CardContent>
