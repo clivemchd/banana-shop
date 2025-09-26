@@ -11,6 +11,7 @@ export type UserSubscriptionInfo = {
   paymentProcessorUserId: string | null;
   billingCycle: string | null;
   billingEndDate: Date | null;
+  isPlanRenewed: boolean;
 };
 
 export const getCurrentUserSubscription = async (_args: any, context: any): Promise<UserSubscriptionInfo> => {
@@ -28,6 +29,7 @@ export const getCurrentUserSubscription = async (_args: any, context: any): Prom
       paymentProcessorUserId: true,
       billingCycle: true,
       billingEndDate: true,
+      isPlanRenewed: true,
     },
   });
 
@@ -44,5 +46,6 @@ export const getCurrentUserSubscription = async (_args: any, context: any): Prom
     paymentProcessorUserId: user.paymentProcessorUserId,
     billingCycle: user.billingCycle,
     billingEndDate: user.billingEndDate,
+    isPlanRenewed: user.isPlanRenewed,
   };
 };

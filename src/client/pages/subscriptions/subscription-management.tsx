@@ -12,14 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { CreditCard, Calendar, Crown, Settings, ExternalLink, Check, X, RefreshCw, AlertTriangle } from 'lucide-react';
 import Navbar from '../landing/navbar';
-import { 
-    getUnifiedPlans, 
-    calculatePlanPricing, 
-    calculateAnnualSavings, 
+import {
+    getUnifiedPlans,
+    calculatePlanPricing,
+    calculateAnnualSavings,
     getMaxAnnualSavingsPercent,
     formatPrice,
     type BillingCycle,
-    type PlanPricing 
+    type PlanPricing
 } from '../../utils/pricing-calculations';
 
 // User subscription info type matching the server operations
@@ -32,6 +32,7 @@ type UserSubscriptionInfo = {
     paymentProcessorUserId: string | null;
     billingCycle: string | null;
     billingEndDate: Date | null;
+    isPlanRenewed: boolean;
 };
 
 const SubscriptionManagementPage = () => {
@@ -70,7 +71,7 @@ const SubscriptionManagementPage = () => {
         const scheduled = searchParams.get('scheduled');
         const success = searchParams.get('success');
         const canceled = searchParams.get('canceled');
-        
+
         if (scheduled === 'true') {
             setShowScheduledMessage(true);
             // Hide message after 10 seconds
@@ -78,11 +79,11 @@ const SubscriptionManagementPage = () => {
                 setShowScheduledMessage(false);
             }, 10000);
         }
-        
+
         // Remove all parameters from URL to prevent showing messages on refresh
         const newSearchParams = new URLSearchParams(searchParams);
         let shouldUpdate = false;
-        
+
         if (scheduled) {
             newSearchParams.delete('scheduled');
             shouldUpdate = true;
@@ -95,7 +96,7 @@ const SubscriptionManagementPage = () => {
             newSearchParams.delete('canceled');
             shouldUpdate = true;
         }
-        
+
         if (shouldUpdate) {
             setSearchParams(newSearchParams);
         }
@@ -133,6 +134,7 @@ const SubscriptionManagementPage = () => {
         paymentProcessorUserId: subscriptionData.paymentProcessorUserId,
         billingCycle: subscriptionData.billingCycle || null,
         billingEndDate: subscriptionData.billingEndDate || null,
+        isPlanRenewed: subscriptionData.isPlanRenewed ?? true,
     } : (user ? {
         isSubscribed: user.subscriptionStatus === 'active',
         subscriptionStatus: user.subscriptionStatus || null,
@@ -142,6 +144,7 @@ const SubscriptionManagementPage = () => {
         paymentProcessorUserId: user.paymentProcessorUserId || null,
         billingCycle: user.billingCycle || null,
         billingEndDate: user.billingEndDate || null,
+        isPlanRenewed: user.isPlanRenewed ?? true,
     } : null);
 
     // Check if launch offer is active from server data
@@ -150,7 +153,7 @@ const SubscriptionManagementPage = () => {
 
     // Calculate maximum annual savings for the badge using shared utility
     const maxAnnualSavings = getMaxAnnualSavingsPercent();
-    
+
     // Get unified plans
     const unifiedPlans = getUnifiedPlans();
 
@@ -167,7 +170,7 @@ const SubscriptionManagementPage = () => {
         if (currentPlan && subscription?.isSubscribed) {
             const newPlanPrice = paymentPlans[planId as keyof typeof paymentPlans]?.price || 0;
             const currentPrice = currentPlan.price;
-            
+
             if (newPlanPrice < currentPrice) {
                 // Show confirmation modal for downgrades
                 setPendingPlanId(planId);
@@ -184,17 +187,17 @@ const SubscriptionManagementPage = () => {
         try {
             setIsPaymentLoading(true);
             setErrorMessage(null);
-            
+
             // Check if user has existing subscription
             const isUpgradeOrSwitch = Boolean(subscription?.isSubscribed && currentPlan);
-            
+
             const { sessionUrl } = await generateCheckoutSession({
                 paymentPlanId: planId,
                 billingCycle: billingCycle,
                 // Add parameter to indicate this is a plan change (will be handled by backend)
                 isSubscriptionChange: isUpgradeOrSwitch
             });
-            
+
             if (sessionUrl) {
                 window.location.href = sessionUrl;
             }
@@ -213,7 +216,7 @@ const SubscriptionManagementPage = () => {
     // Get billing cycle from stored database value - always use database as source of truth
     const getCurrentBillingCycle = (): BillingCycle => {
         if (!subscription?.billingCycle) return 'monthly';
-        
+
         // Normalize the stored billing cycle to match our BillingCycle type
         return subscription.billingCycle === 'annual' ? 'annual' : 'monthly';
     };
@@ -239,6 +242,7 @@ const SubscriptionManagementPage = () => {
             billingEndDate: subscription.billingEndDate,
             datePaid: subscription.datePaid,
             subscriptionStatus: subscription.subscriptionStatus,
+            isPlanRenewed: subscription.isPlanRenewed,
             calculatedBillingCycle: getCurrentBillingCycle()
         });
     }
@@ -289,10 +293,10 @@ const SubscriptionManagementPage = () => {
             // Get the plan price from paymentPlans for comparison
             const planPrice = paymentPlans[plan.planId as keyof typeof paymentPlans]?.price || 0;
             const currentPrice = currentPlan.price;
-            
+
             const isUpgrade = planPrice > currentPrice;
             const isDowngrade = planPrice < currentPrice;
-            
+
             if (isUpgrade) {
                 return { text: 'Upgrade Now', variant: 'default' as const, disabled: false };
             } else if (isDowngrade) {
@@ -322,7 +326,7 @@ const SubscriptionManagementPage = () => {
 
         try {
             const result = await syncUserCredits();
-            
+
             if (result.success) {
                 setSyncMessage(`✅ Credits synced! New balance: ${result.newBalance} credits`);
                 // Refresh the page data to show updated credits
@@ -354,8 +358,22 @@ const SubscriptionManagementPage = () => {
                     <Alert className="mb-8 border-green-200 bg-green-50">
                         <Check className="h-4 w-4 text-green-600" />
                         <AlertDescription className="text-green-800">
-                            <strong>Subscription Change Scheduled!</strong> Your new plan will start when your current billing cycle ends. 
+                            <strong>Subscription Change Scheduled!</strong> Your new plan will start when your current billing cycle ends.
                             You can continue using your current plan until then.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {/* Plan Cancellation Alert */}
+                {subscription?.subscriptionStatus === 'active' && subscription?.isPlanRenewed === false && (
+                    <Alert className="mb-8 border-orange-200 bg-orange-50">
+                        <AlertTriangle className="h-4 w-4 text-orange-600" />
+                        <AlertDescription className="text-orange-800">
+                            <strong>Subscription Cancelled</strong> - Your subscription will end on{' '}
+                            {subscription.billingEndDate
+                                ? new Date(subscription.billingEndDate).toLocaleDateString()
+                                : 'your next billing date'
+                            }. You'll continue to have access to all features until then.
                         </AlertDescription>
                     </Alert>
                 )}
@@ -387,45 +405,47 @@ const SubscriptionManagementPage = () => {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                             {/* Plan Info - Only show if user has a subscription */}
                             {currentPlan && (
                                 <div className="space-y-2">
                                     <p className="text-sm text-muted-foreground">Plan</p>
-                                    <p className="text-2xl font-semibold">{currentPlan.name}</p>
+                                    <p className="text-2xl font-semibold align-middle">
+                                        {currentPlan.name}{' '} 
+                                        <Badge className="text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white">
+                                            {discountPercent}% OFF
+                                        </Badge>
+                                    </p>
                                     <div className="flex items-center gap-2">
                                         {isLaunchActive ? (
                                             <>
                                                 <p className="text-muted-foreground">
-                                                    {currentUnifiedPlan 
+                                                    {currentUnifiedPlan
                                                         ? (() => {
                                                             const pricing = calculatePlanPricing(currentUnifiedPlan, currentBillingCycle, true, discountPercent);
                                                             // For annual billing, show the full annual price (multiply monthly by 12)
-                                                            const displayAmount = currentBillingCycle === 'annual' 
-                                                                ? pricing.displayPrice * 12 
+                                                            const displayAmount = currentBillingCycle === 'annual'
+                                                                ? pricing.displayPrice * 12
                                                                 : pricing.displayPrice;
                                                             return `$${formatPrice(displayAmount)}/${currentBillingCycle === 'annual' ? 'year' : 'month'}`;
-                                                          })()
+                                                        })()
                                                         : currentBillingCycle === 'annual'
                                                             ? `$${formatPrice(currentPlan.price * 12 * (1 - discountPercent / 100))}/year`
                                                             : `$${formatPrice(currentPlan.price * (1 - discountPercent / 100))}/month`
                                                     }
                                                 </p>
-                                                <Badge className="text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white">
-                                                    {discountPercent}% OFF
-                                                </Badge>
                                             </>
                                         ) : (
                                             <p className="text-muted-foreground">
-                                                {currentUnifiedPlan 
+                                                {currentUnifiedPlan
                                                     ? (() => {
                                                         const pricing = calculatePlanPricing(currentUnifiedPlan, currentBillingCycle, false);
                                                         // For annual billing, show the full annual price (multiply monthly by 12)
-                                                        const displayAmount = currentBillingCycle === 'annual' 
-                                                            ? pricing.displayPrice * 12 
+                                                        const displayAmount = currentBillingCycle === 'annual'
+                                                            ? pricing.displayPrice * 12
                                                             : pricing.displayPrice;
                                                         return `$${formatPrice(displayAmount)}/${currentBillingCycle === 'annual' ? 'year' : 'month'}`;
-                                                      })()
+                                                    })()
                                                     : currentBillingCycle === 'annual'
                                                         ? `$${formatPrice(currentPlan.price * 12)}/year`
                                                         : `$${formatPrice(currentPlan.price)}/month`
@@ -439,7 +459,9 @@ const SubscriptionManagementPage = () => {
                             {/* Status */}
                             <div className="space-y-2">
                                 <p className="text-sm text-muted-foreground">Status</p>
-                                <div>{getSubscriptionStatusBadge()}</div>
+                                <div className="space-y-1">
+                                    {getSubscriptionStatusBadge()}
+                                </div>
                             </div>
 
                             {/* Credits Available */}
@@ -454,10 +476,23 @@ const SubscriptionManagementPage = () => {
                                 )}
                             </div>
 
-                            {/* Next Billing Date */}
+                            {/* Last Payment */}
+                            {subscription?.datePaid && (
+                                <div className="space-y-2">
+                                    <p className="text-sm text-muted-foreground">Last Payment</p>
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        <p>{new Date(subscription.datePaid).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Next Billing Date / Ends On Date */}
                             {subscription?.datePaid && subscription?.subscriptionStatus === 'active' && (
                                 <div className="space-y-2">
-                                    <p className="text-sm text-muted-foreground">Next Billing</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {subscription.isPlanRenewed === false ? 'Ends On' : 'Next Billing'}
+                                    </p>
                                     <div className="flex items-center gap-2">
                                         <Calendar className="h-4 w-4 text-muted-foreground" />
                                         <p>
@@ -466,7 +501,7 @@ const SubscriptionManagementPage = () => {
                                                 if (subscription.billingEndDate) {
                                                     return new Date(subscription.billingEndDate).toLocaleDateString();
                                                 }
-                                                
+
                                                 // Fallback to calculation based on last payment and billing cycle
                                                 const lastPayment = new Date(subscription.datePaid);
                                                 const nextBilling = new Date(lastPayment);
@@ -478,13 +513,14 @@ const SubscriptionManagementPage = () => {
                                 </div>
                             )}
 
-                            {/* Last Payment */}
-                            {subscription?.datePaid && (
+                            {/* Auto Renew Status */}
+                            {subscription?.subscriptionStatus === 'active' && subscription.isPlanRenewed === false && (
                                 <div className="space-y-2">
-                                    <p className="text-sm text-muted-foreground">Last Payment</p>
+                                    <p className="text-sm text-muted-foreground">Auto Renew</p>
                                     <div className="flex items-center gap-2">
-                                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                                        <p>{new Date(subscription.datePaid).toLocaleDateString()}</p>
+                                        <Badge variant="destructive" className="text-xs">
+                                            Cancelled
+                                        </Badge>
                                     </div>
                                 </div>
                             )}
@@ -529,7 +565,7 @@ const SubscriptionManagementPage = () => {
                                         <p><strong>Image Editing:</strong> 1 credit each</p>
                                         <p>Credits refresh with each billing cycle</p>
                                     </div>
-                                    
+
                                     <Button
                                         onClick={handleSyncCredits}
                                         disabled={isSyncingCredits}
@@ -580,7 +616,7 @@ const SubscriptionManagementPage = () => {
                             )}
 
                             <div className="text-xs text-muted-foreground">
-                                {subscription?.subscriptionStatus === 'canceled' 
+                                {subscription?.subscriptionStatus === 'canceled'
                                     ? 'Billing portal is not available for cancelled subscriptions.'
                                     : 'Opens Stripe Customer Portal in a new window to manage payment methods, invoices, and subscription settings.'
                                 }
@@ -653,7 +689,7 @@ const SubscriptionManagementPage = () => {
                                                 {(() => {
                                                     const pricing = calculatePlanPricing(plan, billingCycle, isLaunchActive, discountPercent);
                                                     const annualSavings = calculateAnnualSavings(plan, isLaunchActive, discountPercent);
-                                                    
+
                                                     return (
                                                         <>
                                                             {pricing.isDiscounted ? (
@@ -817,7 +853,7 @@ const SubscriptionManagementPage = () => {
                             You're about to downgrade your subscription. Please review what will change.
                         </DialogDescription>
                     </DialogHeader>
-                    
+
                     <div className="py-4">
                         {pendingPlanId && currentPlan && (
                             <div className="space-y-4">
@@ -847,9 +883,9 @@ const SubscriptionManagementPage = () => {
                                             const newPlan = paymentPlans[pendingPlanId as keyof typeof paymentPlans];
                                             const currentFeatures = currentPlan.features || [];
                                             const newFeatures = newPlan?.features || [];
-                                            
+
                                             const lostFeatures = currentFeatures.filter(feature => !newFeatures.includes(feature));
-                                            
+
                                             return (
                                                 <>
                                                     {lostFeatures.length > 0 && (
@@ -865,7 +901,7 @@ const SubscriptionManagementPage = () => {
                                                             </ul>
                                                         </div>
                                                     )}
-                                                    
+
                                                     <div className="p-3 bg-blue-50 rounded-lg">
                                                         <p className="text-sm text-blue-800">
                                                             <strong>Important:</strong> Your downgrade will be scheduled for the end of your current billing cycle

@@ -147,6 +147,7 @@ async function handleSubscriptionCreated(subscription: any, context: any) {
           billingCycle: billingCycle,
           billingEndDate: endDate,
           datePaid: new Date(),
+          isPlanRenewed: true, // New subscriptions are always set to renew
         }
       });
       
@@ -340,6 +341,10 @@ async function handleSubscriptionUpdated(subscription: any, context: any) {
       const billingCycle = getBillingCycleFromSubscription(subscription);
       const endDate = getSubscriptionEndDate(subscription);
       
+      // Check if subscription is set to cancel at period end
+      const isPlanRenewed = subscription.status === 'active' ? !subscription.cancel_at_period_end : false;
+      console.log('🔄 Subscription update - cancel_at_period_end:', subscription.cancel_at_period_end, 'isPlanRenewed:', isPlanRenewed);
+      
       const result = await context.entities.Users.updateMany({
         where: { paymentProcessorUserId: subscription.customer },
         data: { 
@@ -347,6 +352,7 @@ async function handleSubscriptionUpdated(subscription: any, context: any) {
           subscriptionPlan: getPaymentPlanFromSubscription(subscription),
           billingCycle: billingCycle,
           billingEndDate: endDate,
+          isPlanRenewed: isPlanRenewed,
           ...(subscription.status === 'active' && { datePaid: new Date() })
         }
       });
@@ -387,6 +393,7 @@ async function handleSubscriptionDeleted(subscription: any, context: any) {
           subscriptionPlan: null,
           billingCycle: null,
           billingEndDate: null,
+          isPlanRenewed: false,
           credits: 0, // Reset credits to zero when subscription is cancelled
         }
       });
@@ -445,6 +452,7 @@ async function handleCheckoutCompleted(session: any, context: any) {
           billingCycle: billingCycle,
           billingEndDate: endDate,
           datePaid: new Date(),
+          isPlanRenewed: true, // New subscriptions are always set to renew
         }
       });
       
@@ -499,6 +507,7 @@ async function handleSubscriptionScheduleReleased(subscriptionSchedule: any, con
           billingCycle: billingCycle,
           billingEndDate: endDate,
           datePaid: new Date(),
+          isPlanRenewed: true, // New subscriptions are always set to renew
         }
       });
       

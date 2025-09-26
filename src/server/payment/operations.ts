@@ -121,6 +121,7 @@ export const getCurrentUserSubscription = async (_args: any, context: any) => {
       credits: true,
       billingCycle: true,
       billingEndDate: true,
+      isPlanRenewed: true,
     },
   });
 
@@ -137,6 +138,7 @@ export const getCurrentUserSubscription = async (_args: any, context: any) => {
     paymentProcessorUserId: user.paymentProcessorUserId,
     billingCycle: user.billingCycle,
     billingEndDate: user.billingEndDate,
+    isPlanRenewed: user.isPlanRenewed,
   };
 };
 
