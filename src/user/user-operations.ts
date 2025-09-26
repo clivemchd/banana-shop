@@ -12,6 +12,10 @@ export type UserSubscriptionInfo = {
   billingCycle: string | null;
   billingEndDate: Date | null;
   isPlanRenewed: boolean;
+  // New fields for scheduled plan changes
+  scheduledPlanId: string | null;
+  scheduledBillingCycle: string | null;
+  scheduledStartDate: Date | null;
 };
 
 export const getCurrentUserSubscription = async (_args: any, context: any): Promise<UserSubscriptionInfo> => {
@@ -30,6 +34,9 @@ export const getCurrentUserSubscription = async (_args: any, context: any): Prom
       billingCycle: true,
       billingEndDate: true,
       isPlanRenewed: true,
+      scheduledPlanId: true,
+      scheduledBillingCycle: true,
+      scheduledStartDate: true,
     },
   });
 
@@ -47,5 +54,8 @@ export const getCurrentUserSubscription = async (_args: any, context: any): Prom
     billingCycle: user.billingCycle,
     billingEndDate: user.billingEndDate,
     isPlanRenewed: user.isPlanRenewed,
+    scheduledPlanId: user.scheduledPlanId,
+    scheduledBillingCycle: user.scheduledBillingCycle,
+    scheduledStartDate: user.scheduledStartDate,
   };
 };

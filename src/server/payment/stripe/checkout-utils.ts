@@ -16,7 +16,7 @@ export async function createStripeCheckoutSession({
   customerId,
   mode,
   successUrl = `${process.env.WASP_WEB_CLIENT_URL}/checkout?success=true`,
-  cancelUrl = `${process.env.WASP_WEB_CLIENT_URL}/pricing?canceled=true`,
+  cancelUrl = `${process.env.WASP_WEB_CLIENT_URL}/subscription?canceled=true`,
   metadata = {},
 }: CreateStripeCheckoutSessionArgs): Promise<Stripe.Checkout.Session> {
   

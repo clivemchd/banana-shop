@@ -88,7 +88,7 @@ export default function CheckoutPage() {
           {paymentStatus !== 'loading' && paymentStatus !== 'success' && (
             <div className="flex flex-col gap-3 mt-8">
               <Button 
-                onClick={() => navigate('/pricing')}
+                onClick={() => navigate('/subscription')}
                 className="w-full"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />

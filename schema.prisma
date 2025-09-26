@@ -31,4 +31,8 @@ model Users {
 	datePaid DateTime?
 	billingEndDate DateTime?
 	credits Int @default(0)
+	// Fields for scheduled plan changes
+	scheduledPlanId String? // The plan that will be activated
+	scheduledBillingCycle String? // The billing cycle for the scheduled plan
+	scheduledStartDate DateTime? // When the scheduled plan will start
 }

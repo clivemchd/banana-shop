@@ -148,6 +148,10 @@ async function handleSubscriptionCreated(subscription: any, context: any) {
           billingEndDate: endDate,
           datePaid: new Date(),
           isPlanRenewed: true, // New subscriptions are always set to renew
+          // Clear any previous scheduled plan fields for new subscriptions
+          scheduledPlanId: null,
+          scheduledBillingCycle: null,
+          scheduledStartDate: null,
         }
       });
       
@@ -230,6 +234,36 @@ function getPaymentPlanFromSubscription(subscription: any): string | null {
   } catch (error) {
     console.error('❌ Error extracting plan from subscription:', error);
     return null;
+  }
+}
+
+// Helper function to get payment plan from price ID directly
+function getPaymentPlanFromPriceId(priceId: string): string | null {
+  const priceToplan: Record<string, string> = {
+    // Monthly plans (mock for development)
+    'price_mock_starter_9_monthly': 'starter',
+    'price_mock_pro_19_monthly': 'pro', 
+    'price_mock_business_89_monthly': 'business',
+    // Annual plans (mock for development)
+    'price_mock_starter_86_annual': 'starter',
+    'price_mock_pro_182_annual': 'pro',
+    'price_mock_business_854_annual': 'business',
+    // Real price IDs from your Stripe account
+    'price_1S9a1BKPBVKSP3Z42CpnaDkv': 'pro',     // $19.00 plan
+    'price_1S9a02KPBVKSP3Z4slA5Lv0y': 'starter', // $9.00 plan
+  };
+  
+  return priceToplan[priceId] || null;
+}
+
+// Helper function to get billing interval from price ID
+async function getIntervalFromPriceId(priceId: string): Promise<string> {
+  try {
+    const price = await stripe.prices.retrieve(priceId);
+    return price.recurring?.interval || 'monthly';
+  } catch (error) {
+    console.error('Failed to fetch price details:', error);
+    return 'monthly'; // Default fallback
   }
 }
 
@@ -345,6 +379,44 @@ async function handleSubscriptionUpdated(subscription: any, context: any) {
       const isPlanRenewed = subscription.status === 'active' ? !subscription.cancel_at_period_end : false;
       console.log('🔄 Subscription update - cancel_at_period_end:', subscription.cancel_at_period_end, 'isPlanRenewed:', isPlanRenewed);
       
+      // Check if there's a scheduled plan change (when subscription has pending changes)
+      let scheduledPlanData = {};
+      if (subscription.schedule) {
+        console.log('📅 Subscription has a schedule attached:', subscription.schedule);
+        try {
+          // Fetch the schedule to get details about the upcoming change
+          const schedule = await stripe.subscriptionSchedules.retrieve(subscription.schedule);
+          console.log('🔍 Schedule details:', schedule);
+          
+          // Get the next phase (upcoming plan change)
+          const nextPhase = schedule.phases?.find((phase: any) => phase.start_date > Math.floor(Date.now() / 1000));
+          if (nextPhase && nextPhase.items?.length > 0) {
+            const priceItem = nextPhase.items[0].price;
+            const priceId = typeof priceItem === 'string' ? priceItem : priceItem?.id;
+            
+            const nextPlanId = priceId ? getPaymentPlanFromPriceId(priceId) : null;
+            const nextBillingCycle = priceId ? await getIntervalFromPriceId(priceId) : 'monthly';
+            
+            scheduledPlanData = {
+              scheduledPlanId: nextPlanId,
+              scheduledBillingCycle: nextBillingCycle,
+              scheduledStartDate: new Date(nextPhase.start_date * 1000),
+            };
+            
+            console.log('📋 Scheduled plan change detected:', scheduledPlanData);
+          }
+        } catch (scheduleError) {
+          console.error('❌ Failed to fetch subscription schedule:', scheduleError);
+        }
+      } else {
+        // Clear scheduled plan data if no schedule is attached
+        scheduledPlanData = {
+          scheduledPlanId: null,
+          scheduledBillingCycle: null,
+          scheduledStartDate: null,
+        };
+      }
+      
       const result = await context.entities.Users.updateMany({
         where: { paymentProcessorUserId: subscription.customer },
         data: { 
@@ -353,6 +425,7 @@ async function handleSubscriptionUpdated(subscription: any, context: any) {
           billingCycle: billingCycle,
           billingEndDate: endDate,
           isPlanRenewed: isPlanRenewed,
+          ...scheduledPlanData,
           ...(subscription.status === 'active' && { datePaid: new Date() })
         }
       });
@@ -395,6 +468,10 @@ async function handleSubscriptionDeleted(subscription: any, context: any) {
           billingEndDate: null,
           isPlanRenewed: false,
           credits: 0, // Reset credits to zero when subscription is cancelled
+          // Clear scheduled plan fields when subscription is completely cancelled
+          scheduledPlanId: null,
+          scheduledBillingCycle: null,
+          scheduledStartDate: null,
         }
       });
       console.log('✅ User subscription status updated to canceled and credits reset to 0, affected rows:', result.count);
@@ -453,6 +530,10 @@ async function handleCheckoutCompleted(session: any, context: any) {
           billingEndDate: endDate,
           datePaid: new Date(),
           isPlanRenewed: true, // New subscriptions are always set to renew
+          // Clear any scheduled plan fields for new checkouts
+          scheduledPlanId: null,
+          scheduledBillingCycle: null,
+          scheduledStartDate: null,
         }
       });
       
@@ -471,6 +552,40 @@ async function handleSubscriptionScheduleCreated(subscriptionSchedule: any, cont
     status: subscriptionSchedule.status,
     startDate: new Date(subscriptionSchedule.phases[0]?.start_date * 1000).toISOString()
   });
+  
+  if (subscriptionSchedule.customer) {
+    try {
+      // Get the scheduled plan details from the phases
+      const nextPhase = subscriptionSchedule.phases?.find((phase: any) => phase.start_date > Math.floor(Date.now() / 1000));
+      if (nextPhase && nextPhase.items?.length > 0) {
+        const priceItem = nextPhase.items[0].price;
+        const priceId = typeof priceItem === 'string' ? priceItem : priceItem?.id;
+        
+        const scheduledPlanId = priceId ? getPaymentPlanFromPriceId(priceId) : null;
+        const scheduledBillingCycle = priceId ? await getIntervalFromPriceId(priceId) : 'monthly';
+        const scheduledStartDate = new Date(nextPhase.start_date * 1000);
+        
+        // Update user with scheduled plan information
+        const result = await context.entities.Users.updateMany({
+          where: { paymentProcessorUserId: subscriptionSchedule.customer },
+          data: { 
+            scheduledPlanId: scheduledPlanId,
+            scheduledBillingCycle: scheduledBillingCycle,
+            scheduledStartDate: scheduledStartDate,
+          }
+        });
+        
+        console.log('✅ User scheduled plan data updated, affected rows:', result.count);
+        console.log('📋 Scheduled plan details:', {
+          scheduledPlanId,
+          scheduledBillingCycle,
+          scheduledStartDate: scheduledStartDate.toISOString()
+        });
+      }
+    } catch (error) {
+      console.error('❌ Failed to update scheduled plan data:', error);
+    }
+  }
   
   // Log the scheduled subscription change
   console.log('✅ User will have their subscription changed according to the schedule');
@@ -508,6 +623,10 @@ async function handleSubscriptionScheduleReleased(subscriptionSchedule: any, con
           billingEndDate: endDate,
           datePaid: new Date(),
           isPlanRenewed: true, // New subscriptions are always set to renew
+          // Clear scheduled plan fields since they're now active
+          scheduledPlanId: null,
+          scheduledBillingCycle: null,
+          scheduledStartDate: null,
         }
       });
       

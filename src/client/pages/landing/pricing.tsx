@@ -50,11 +50,11 @@ const Pricing = () => {
 	// Helper function to get button text and style for each plan
 	const getButtonConfig = (plan: PlanPricing) => {
 		if (!currentSubscription?.isSubscribed) {
-			return { text: plan.cta || 'Get Started', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
+			return { text: plan.cta || 'Get Started', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false, hidden: false };
 		}
 
 		if (currentSubscription.subscriptionPlan === plan.planId) {
-			return { text: 'Current Plan', style: 'bg-muted text-muted-foreground cursor-not-allowed', disabled: true };
+			return { text: 'Current Plan', style: 'bg-muted text-muted-foreground cursor-not-allowed', disabled: true, hidden: false };
 		}
 
 		if (currentPlan) {
@@ -62,13 +62,14 @@ const Pricing = () => {
 			const isDowngrade = plan.price < currentPlan.price;
 			
 			if (isUpgrade) {
-				return { text: 'Upgrade', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
+				return { text: 'Upgrade', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false, hidden: false };
 			} else if (isDowngrade) {
-				return { text: 'Downgrade', style: 'bg-secondary text-secondary-foreground hover:bg-secondary/80', disabled: false };
+				// Temporarily disable downgrade buttons by hiding them
+				return { text: 'Downgrade', style: 'bg-secondary text-secondary-foreground hover:bg-secondary/80', disabled: false, hidden: true };
 			}
 		}
 
-		return { text: plan.cta || 'Get Started', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false };
+		return { text: plan.cta || 'Get Started', style: 'bg-primary text-primary-foreground hover:bg-primary/90', disabled: false, hidden: false };
 	};
 
 	const handleGetStarted = async (planId: PaymentPlanId) => {
@@ -255,6 +256,17 @@ const Pricing = () => {
 							<div className='mt-auto pt-6'>
 								{(() => {
 									const buttonConfig = getButtonConfig(plan);
+									
+									// Hide downgrade buttons temporarily
+									if (buttonConfig.hidden) {
+											return null;
+										// return (
+										// 	<div className="w-full py-2 rounded-md bg-muted text-muted-foreground text-center text-sm">
+										// 		Downgrades temporarily unavailable
+										// 	</div>
+										// );
+									}
+									
 									return (
 										<Button
 											onClick={() => handleGetStarted(plan.planId)}
