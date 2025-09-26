@@ -59,7 +59,7 @@ const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated =
   );
 };
 
-const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string; profileImage?: string; navigate: any }) => {
+const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string; profileImage?: string | null; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -228,7 +228,7 @@ const ThemeToggle = () => {
   );
 };
 
-const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, navigate }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string; navigate: any }) => {
+const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, navigate }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string | null; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -343,7 +343,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const isAuthenticated = !!user;
   const userEmail = user?.email || user?.username || "User";
-  const profileImage = (user as any)?.profileImage || null;
+  const profileImage = user?.profileImage || null;
 
   return (
     <nav className="h-16 bg-background border-b border-accent">

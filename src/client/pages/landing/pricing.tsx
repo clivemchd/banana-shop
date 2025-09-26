@@ -38,9 +38,9 @@ const Pricing = () => {
 
 	// Get current subscription info from user data
 	const currentSubscription = user ? {
-		isSubscribed: (user as any).subscriptionStatus === 'active',
-		subscriptionPlan: (user as any).subscriptionPlan as PaymentPlanId | null,
-		subscriptionStatus: (user as any).subscriptionStatus || null,
+		isSubscribed: user.subscriptionStatus === 'active',
+		subscriptionPlan: user.subscriptionPlan as PaymentPlanId | null,
+		subscriptionStatus: user.subscriptionStatus || null,
 	} : null;
 
 	const currentPlan = currentSubscription?.subscriptionPlan 
@@ -86,7 +86,7 @@ const Pricing = () => {
 			const { sessionUrl } = await generateCheckoutSession({
 				paymentPlanId: planId,
 				billingCycle: billingCycle
-			} as any);
+			});
 			
 			if (sessionUrl) {
 				// Redirect to Stripe checkout

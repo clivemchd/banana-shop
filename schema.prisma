@@ -22,10 +22,12 @@ model Users {
 	email String @unique
 	name String? 
 	username String? @unique
+	profileImage String?
   	paymentProcessorUserId String? @unique
 	subscriptionStatus String?
 	subscriptionPlan String?
 	billingCycle String? // 'monthly' or 'annual'
+	isPlanRenewed Boolean @default(true)
 	datePaid DateTime?
 	billingEndDate DateTime?
 	credits Int @default(0)

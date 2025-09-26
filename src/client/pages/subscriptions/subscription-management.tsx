@@ -22,7 +22,7 @@ import {
     type PlanPricing 
 } from '../../utils/pricing-calculations';
 
-// Temporary type until operation is generated
+// User subscription info type matching the server operations
 type UserSubscriptionInfo = {
     isSubscribed: boolean;
     subscriptionStatus: string | null;
@@ -31,7 +31,7 @@ type UserSubscriptionInfo = {
     credits: number;
     paymentProcessorUserId: string | null;
     billingCycle: string | null;
-    endDate: Date | null;
+    billingEndDate: Date | null;
 };
 
 const SubscriptionManagementPage = () => {
@@ -127,21 +127,21 @@ const SubscriptionManagementPage = () => {
     const subscription: UserSubscriptionInfo | null = subscriptionData ? {
         isSubscribed: subscriptionData.isSubscribed,
         subscriptionStatus: subscriptionData.subscriptionStatus,
-        subscriptionPlan: subscriptionData.subscriptionPlan,
+        subscriptionPlan: subscriptionData.subscriptionPlan as PaymentPlanId | null,
         datePaid: subscriptionData.datePaid,
         credits: subscriptionData.credits,
         paymentProcessorUserId: subscriptionData.paymentProcessorUserId,
-        billingCycle: (subscriptionData as any).billingCycle || null,
-        endDate: (subscriptionData as any).billingEndDate || null,
+        billingCycle: subscriptionData.billingCycle || null,
+        billingEndDate: subscriptionData.billingEndDate || null,
     } : (user ? {
-        isSubscribed: (user as any).subscriptionStatus === 'active',
-        subscriptionStatus: (user as any).subscriptionStatus || null,
-        subscriptionPlan: (user as any).subscriptionPlan || null,
-        datePaid: (user as any).datePaid || null,
-        credits: (user as any).credits || 0,
-        paymentProcessorUserId: (user as any).paymentProcessorUserId || null,
-        billingCycle: (user as any).billingCycle || null,
-        endDate: (user as any).billingEndDate || null,
+        isSubscribed: user.subscriptionStatus === 'active',
+        subscriptionStatus: user.subscriptionStatus || null,
+        subscriptionPlan: user.subscriptionPlan as PaymentPlanId | null,
+        datePaid: user.datePaid || null,
+        credits: user.credits || 0,
+        paymentProcessorUserId: user.paymentProcessorUserId || null,
+        billingCycle: user.billingCycle || null,
+        billingEndDate: user.billingEndDate || null,
     } : null);
 
     // Check if launch offer is active from server data
@@ -236,7 +236,7 @@ const SubscriptionManagementPage = () => {
     if (subscription) {
         console.log('DEBUG: Subscription data', {
             billingCycle: subscription.billingCycle,
-            endDate: subscription.endDate,
+            billingEndDate: subscription.billingEndDate,
             datePaid: subscription.datePaid,
             subscriptionStatus: subscription.subscriptionStatus,
             calculatedBillingCycle: getCurrentBillingCycle()
@@ -462,9 +462,9 @@ const SubscriptionManagementPage = () => {
                                         <Calendar className="h-4 w-4 text-muted-foreground" />
                                         <p>
                                             {(() => {
-                                                // Use stored endDate if available, otherwise calculate from last payment
-                                                if (subscription.endDate) {
-                                                    return new Date(subscription.endDate).toLocaleDateString();
+                                                // Use stored billingEndDate if available, otherwise calculate from last payment
+                                                if (subscription.billingEndDate) {
+                                                    return new Date(subscription.billingEndDate).toLocaleDateString();
                                                 }
                                                 
                                                 // Fallback to calculation based on last payment and billing cycle
