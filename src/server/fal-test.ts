@@ -1,8 +1,8 @@
 import { fal } from "@fal-ai/client";
-import { serverConfig } from "./utils/environment";
+import { getServerConfig } from "./utils/environment";
 
 fal.config({
-    credentials: serverConfig.fal.apiKey,
+    credentials: getServerConfig().fal.apiKey,
 });
 
 interface ImageOptionTypes {

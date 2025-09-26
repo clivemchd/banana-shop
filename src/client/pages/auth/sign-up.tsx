@@ -1,7 +1,7 @@
 import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
-import { signup } from "wasp/client/auth";
-import { useState } from "react";
+import { signup, useAuth } from "wasp/client/auth";
+import { useState, useEffect } from "react";
 import { cn } from "../../../lib/utils";
 import { Environment } from "../../utils/environment";
 import { Button } from "../../components/ui/button";
@@ -25,6 +25,7 @@ import {
 import Navbar from "../landing/navbar";
 
 export const SignUpPage = () => {
+  const { data: user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +35,13 @@ export const SignUpPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [signupComplete, setSignupComplete] = useState(false);
   const navigate = useNavigate();
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

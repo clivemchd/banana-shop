@@ -6,8 +6,8 @@ export const getVerificationEmailContent: GetVerificationEmailContentFn = ({ ver
   console.log('🔧 DEBUG: getVerificationEmailContent called with link:', verificationLink);
   
   const emailContent = {
-    subject: '✨ Verify Your Micro Banana Email',
-  text: `Welcome to Micro Banana! 🍌
+    subject: '✨ Verify Your Nano Studio Email',
+  text: `Welcome to Nano Studio!
 
 Thanks for signing up! We need to verify your email address to complete your account setup.
 
@@ -16,10 +16,10 @@ ${verificationLink}
 
 This link will expire in 24 hours for security reasons.
 
-If you didn't sign up for Micro Banana, you can safely ignore this email.
+If you didn't sign up for Nano Studio, you can safely ignore this email.
 
 Welcome aboard!
-The Micro Banana Team
+The Nano Studio Team
 
 ---
 🚧 DEVELOPMENT MODE: This email is being logged to the terminal instead of being sent.
@@ -27,11 +27,11 @@ The Micro Banana Team
   html: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #f59e0b; margin: 0;">🍌 Micro Banana</h1>
+        <h1 style="color: #f59e0b; margin: 0;">🍌 Nano Studio</h1>
       </div>
       
       <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h2 style="color: #1f2937; margin-top: 0;">Welcome to Micro Banana! ✨</h2>
+        <h2 style="color: #1f2937; margin-top: 0;">Welcome to Nano Studio! ✨</h2>
         <p style="color: #4b5563; line-height: 1.6;">
           Thanks for signing up! We need to verify your email address to complete your account setup.
         </p>
@@ -90,10 +90,10 @@ export const getPasswordResetEmailContent: GetPasswordResetEmailContentFn = ({ p
   console.log('🔧 DEBUG: getPasswordResetEmailContent called with link:', passwordResetLink);
 
   const emailContent = {
-    subject: '🔐 Reset Your Micro Banana Password',
+    subject: '🔐 Reset Your Nano Studio Password',
     text: `Hi there!
 
-You requested a password reset for your Micro Banana account.
+You requested a password reset for your Nano Studio account.
 
 Click the link below to reset your password:
 ${passwordResetLink}
@@ -103,7 +103,7 @@ This link will expire in 24 hours for security reasons.
 If you didn't request this password reset, you can safely ignore this email.
 
 Best regards,
-The Micro Banana Team
+The Nano Studio Team
 
 ---
 🚧 DEVELOPMENT MODE: This email is being logged to the terminal instead of being sent.
@@ -111,13 +111,13 @@ The Micro Banana Team
     html: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #f59e0b; margin: 0;">🍌 Micro Banana</h1>
+        <h1 style="color: #f59e0b; margin: 0;">🍌 Nano Studio</h1>
       </div>
       
       <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
         <h2 style="color: #1f2937; margin-top: 0;">Password Reset Request</h2>
         <p style="color: #4b5563; line-height: 1.6;">
-          Hi there! You requested a password reset for your Micro Banana account.
+          Hi there! You requested a password reset for your Nano Studio account.
         </p>
         <p style="color: #4b5563; line-height: 1.6;">
           Click the button below to reset your password:

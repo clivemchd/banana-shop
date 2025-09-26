@@ -1,7 +1,7 @@
 import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import { login } from "wasp/client/auth";
+import { useState, useEffect } from "react";
+import { login, useAuth } from "wasp/client/auth";
 import { Environment } from "../../utils/environment";
 import {
   Tooltip,
@@ -14,12 +14,20 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Inpu
 import { Eye, EyeOff } from "lucide-react";
 
 export const SignInPage = () => {
+  const { data: user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

@@ -20,5 +20,19 @@ model Users {
 	images Image[]
 	isAdmin  Boolean @default(false)
 	email String @unique
+	name String? 
 	username String? @unique
+	profileImage String?
+  	paymentProcessorUserId String? @unique
+	subscriptionStatus String?
+	subscriptionPlan String?
+	billingCycle String? // 'monthly' or 'annual'
+	isPlanRenewed Boolean @default(true)
+	datePaid DateTime?
+	billingEndDate DateTime?
+	credits Int @default(0)
+	// Fields for scheduled plan changes
+	scheduledPlanId String? // The plan that will be activated
+	scheduledBillingCycle String? // The billing cycle for the scheduled plan
+	scheduledStartDate DateTime? // When the scheduled plan will start
 }
