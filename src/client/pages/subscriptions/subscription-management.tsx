@@ -905,11 +905,11 @@ const SubscriptionManagementPage = () => {
                                                     <div className="p-3 bg-blue-50 rounded-lg">
                                                         <p className="text-sm text-blue-800">
                                                             <strong>Important:</strong> Your downgrade will be scheduled for the end of your current billing cycle
-                                                            {subscription?.datePaid && (
+                                                            {subscription?.billingEndDate && (
                                                                 <span>
                                                                     {' '}(approximately{' '}
                                                                     {(() => {
-                                                                        const lastPayment = new Date(subscription.datePaid);
+                                                                        const lastPayment = new Date(subscription.billingEndDate);
                                                                         const nextBilling = new Date(lastPayment);
                                                                         nextBilling.setMonth(nextBilling.getMonth() + 1);
                                                                         return nextBilling.toLocaleDateString();

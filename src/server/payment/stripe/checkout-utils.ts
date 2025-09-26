@@ -136,7 +136,7 @@ export async function createScheduledSubscriptionChange({
   // Return a session-like object for consistency with the existing API
   return {
     session: {
-      url: `${process.env.WASP_WEB_CLIENT_URL}/subscriptions?scheduled=true`,
+      url: `${process.env.WASP_WEB_CLIENT_URL}/subscription?scheduled=true`,
       id: subscriptionSchedule.id,
     }
   };
