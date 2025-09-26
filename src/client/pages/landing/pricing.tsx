@@ -22,6 +22,7 @@ import {
 } from '../../utils/pricing-calculations';
 
 const Pricing = () => {
+	// Keep state but default to monthly (annual option hidden from UI)
 	const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
 	
 	// Get unified plans from the shared utility
@@ -143,18 +144,6 @@ const Pricing = () => {
 					</div>
 				)}
 				
-				<div className='flex items-center justify-center space-x-2 mb-12'>
-					<Label htmlFor='billing-cycle'>Monthly</Label>
-					<Switch
-						id='billing-cycle'
-						checked={billingCycle === 'annual'}
-						onCheckedChange={(checked: boolean) =>
-							setBillingCycle(checked ? 'annual' : 'monthly')
-						}
-					/>
-					<Label htmlFor='billing-cycle'>Annually</Label>
-					<Badge variant='outline'>20% off</Badge>
-				</div>
 				<div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
 					{plans.map((plan) => (
 						<div
@@ -229,6 +218,7 @@ const Pricing = () => {
 												</>
 											)}
 											
+											{/* Annual pricing hidden but logic preserved */}
 											{billingCycle === 'annual' && annualTotal && (
 												<p className='text-xs text-gray-500 mt-1'>
 													{showLaunchOffer ? (

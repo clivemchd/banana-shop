@@ -83,9 +83,10 @@ const PlanComparisonCard: React.FC<PlanComparisonCardProps> = ({
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                {/* Billing Cycle Toggle */}
+                {/* Billing Cycle Toggle - Hidden but logic preserved */}
+                {/* 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div></div> {/* Empty cell to align with feature column */}
+                    <div></div>
                     <div className="md:col-span-3 flex justify-center">
                         <div className="bg-muted p-1 rounded-lg flex">
                             <Button
@@ -112,6 +113,7 @@ const PlanComparisonCard: React.FC<PlanComparisonCardProps> = ({
                         </div>
                     </div>
                 </div>
+                */}
 
                 {/* Plan Headers */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
