@@ -178,7 +178,7 @@ model Users {
 ### 6. 🎛️ Using the Pricing System
 
 #### How Users Purchase Subscriptions
-1. **User visits pricing page** (landing page or `/pricing`)
+1. **User visits pricing page** (landing page or `/subscription`)
 2. **Clicks "Get Started"** button
 3. **If not logged in**: Redirected to signup/login
 4. **If logged in**: Redirected to Stripe Checkout
@@ -187,7 +187,7 @@ model Users {
 7. **User redirected back**: To success page or dashboard
 
 #### Customer Management
-- **Customer Portal**: Users can manage subscriptions via `/pricing` (payment page)
+- **Customer Portal**: Users can manage subscriptions via `/subscription` (payment page)
 - **Subscription Updates**: Handled automatically via webhooks
 - **Payment Failures**: Automatic retry logic via Stripe
 - **Cancellations**: Handled via webhooks
@@ -218,7 +218,7 @@ Check your server logs for webhook processing:
 
 #### Stripe Dashboard Monitoring
 - **Payments**: https://dashboard.stripe.com/payments
-- **Subscriptions**: https://dashboard.stripe.com/subscriptions
+- **Subscriptions**: https://dashboard.stripe.com/subscription
 - **Webhooks**: https://dashboard.stripe.com/webhooks
 - **Logs**: https://dashboard.stripe.com/logs
 

@@ -36,9 +36,9 @@ export const stripePaymentProcessor: PaymentProcessor = {
 
     // Set appropriate success and cancel URLs based on context
     const defaultSuccessUrl = successUrl || (isSubscriptionChange
-      ? `${process.env.WASP_WEB_CLIENT_URL}/subscriptions?success=true`
+      ? `${process.env.WASP_WEB_CLIENT_URL}/subscription?success=true`
       : `${process.env.WASP_WEB_CLIENT_URL}/checkout?success=true`);
-    const defaultCancelUrl = cancelUrl || `${process.env.WASP_WEB_CLIENT_URL}/subscriptions?canceled=true`
+    const defaultCancelUrl = cancelUrl || `${process.env.WASP_WEB_CLIENT_URL}/subscription?canceled=true`
 
     const stripeSession = await createStripeCheckoutSession({
       priceId: paymentPlan.getPaymentProcessorPlanId(billingCycle),

@@ -124,7 +124,6 @@ wasp start
 The application will be available at:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:3001
-- Pricing page: http://localhost:3000/pricing
 
 ## 🧪 Testing
 
@@ -137,7 +136,7 @@ Use Stripe's test cards for development:
 
 ### Testing Flow
 
-1. Go to `/pricing`
+1. Go to `/subscription`
 2. Select a plan and click subscribe
 3. Use test credit card
 4. Verify webhook receives events
