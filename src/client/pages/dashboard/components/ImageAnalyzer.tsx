@@ -1,6 +1,6 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
 import type { SelectionRectangle } from '../types';
-import { editImageRegion, generateImage } from '../services/gemini-service';
+import { generateImage, editImageRegionFromTempStorage, uploadImageToGCS } from '../services/gemini-service';
 import { UploadIcon } from './icons/UploadIcon';
 import { ArrowRightIcon } from './icons/ArrowRightIcon';
 import { UndoIcon } from './icons/UndoIcon';
@@ -115,6 +115,7 @@ const getBestContrastColor = (dominantRgbs: { r: number; g: number; b: number }[
 export interface ImageAnalyzerHandles {
   resetAndUpload: () => void;
   loadImageFile: (file: File) => void;
+  loadImageUrl: (url: string, tempImageId?: string) => void;
 }
 
 interface ImageAnalyzerProps {
@@ -125,6 +126,7 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
   const { onImageStateChange } = props;
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
+  const [currentTempImageId, setCurrentTempImageId] = useState<string | null>(null);
 
   const [selection, setSelection] = useState<SelectionRectangle | null>(null);
   const [brushStrokes, setBrushStrokes] = useState<{ x: number; y: number }[][]>([]);
@@ -263,6 +265,9 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
     },
     loadImageFile: (file: File) => {
       handleImageUpload(file);
+    },
+    loadImageUrl: (url: string, tempImageId?: string) => {
+      handleImageUrlLoad(url, tempImageId);
     }
   }));
 
@@ -287,8 +292,35 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
     }
     setPanOffset({ x: 0, y: 0 });
     
+    // Clear tempImageId for uploaded files (they don't have tempImageIds)
+    if (!file.name.includes('temp-')) {
+      setCurrentTempImageId(null);
+    }
+    
     setHistory([file]);
     setHistoryIndex(0);
+  };
+
+  const handleImageUrlLoad = async (url: string, tempImageId?: string) => {
+    try {
+      // Store the tempImageId for future editing operations
+      if (tempImageId) {
+        setCurrentTempImageId(tempImageId);
+      }
+      
+      // Convert URL to File object for consistency with existing flow
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const file = new File([blob], tempImageId ? `${tempImageId}.png` : 'generated-image.png', { 
+        type: blob.type || 'image/png' 
+      });
+      
+      // Use existing upload handler
+      handleImageUpload(file);
+    } catch (error) {
+      console.error('Failed to load image from URL:', error);
+      setError('Failed to load the generated image.');
+    }
   };
 
   const handlePlaceholderClick = () => {
@@ -527,11 +559,43 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
 
     try {
         // --- STAGE 1: Initial Edit ---
-        const editedCroppedImageBase64 = await editImageRegion(
-            croppedImageBase64,
-            currentImageFile.type,
-            userPrompt
-        );
+        let editedCroppedImageBase64: string;
+        
+        // ALWAYS use GCS-based editing to avoid 413 payload errors
+        let tempImageIdToUse = currentTempImageId;
+        if (!tempImageIdToUse) {
+            // Upload current image to GCS first
+            const uploadResult = await uploadImageToGCS(currentImageFile);
+            setCurrentTempImageId(uploadResult.tempImageId);
+            tempImageIdToUse = uploadResult.tempImageId;
+        }
+        
+        // Use storage-based editing
+        const result = await editImageRegionFromTempStorage(tempImageIdToUse, userPrompt);
+        
+        // Download the edited image and extract the relevant region
+        const response = await fetch(result.imageUrl);
+        const blob = await response.blob();
+        const editedImg = new Image();
+        const editedLoadPromise = new Promise<void>((resolve, reject) => {
+            editedImg.onload = () => resolve();
+            editedImg.onerror = reject;
+        });
+        editedImg.src = URL.createObjectURL(blob);
+        await editedLoadPromise;
+        
+        // Extract the relevant region from the edited image
+        const extractCanvas = document.createElement('canvas');
+        extractCanvas.width = sWidth;
+        extractCanvas.height = sHeight;
+        const extractCtx = extractCanvas.getContext('2d');
+        if (!extractCtx) throw new Error("Could not create extract canvas context.");
+        
+        extractCtx.drawImage(editedImg, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+        editedCroppedImageBase64 = extractCanvas.toDataURL(currentImageFile.type).split(',')[1];
+        
+        // Update tempImageId for future operations
+        setCurrentTempImageId(result.tempImageId);
         
         const compositionCanvas = document.createElement('canvas');
         const imgWidth = loadedImage.naturalWidth;
@@ -544,12 +608,12 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
         // Draw original image and the edited patch on top
         compositionCtx.drawImage(loadedImage, 0, 0);
         const editedPatchImg = new Image();
-        const loadPromise = new Promise<void>((resolve, reject) => { 
+        const patchLoadPromise = new Promise<void>((resolve, reject) => { 
             editedPatchImg.onload = () => resolve();
             editedPatchImg.onerror = reject;
         });
         editedPatchImg.src = `data:${currentImageFile.type};base64,${editedCroppedImageBase64}`;
-        await loadPromise;
+        await patchLoadPromise;
         compositionCtx.drawImage(editedPatchImg, sx, sy, sWidth, sHeight);
 
         // --- STAGE 2: Prepare for Blending ---
@@ -573,20 +637,33 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
         compositionCtx.strokeRect(sx, sy, sWidth, sHeight);
         setDebugImageUrl(compositionCanvas.toDataURL(currentImageFile.type));
 
+        let finalImageUrl: string;
+        let newFile: File;
+        
+        // ALWAYS use GCS-based approach for blending to avoid 413 errors
+        let tempImageIdForBlending = currentTempImageId;
+        if (!tempImageIdForBlending) {
+            // Upload the image for blending to GCS if we don't have a tempImageId
+            const blendingImageBlob = await (await fetch(compositionCanvas.toDataURL(currentImageFile.type))).blob();
+            const blendingFile = new File([blendingImageBlob], 'blending-image.png', { type: currentImageFile.type });
+            const uploadResult = await uploadImageToGCS(blendingFile);
+            tempImageIdForBlending = uploadResult.tempImageId;
+            setCurrentTempImageId(tempImageIdForBlending);
+        }
+
         // Create a dynamic prompt for the AI
         const blendingPrompt = `Seamlessly blend the edges of the area marked by the thick ${colorName} line. You should only modify the pixels of the ${colorName} line itself to create a smooth transition. Do not alter the image content inside or outside the ${colorName} line, people will die if you do. The final image must not have a ${colorName} line.`;
         
-        // --- STAGE 3: Final Blend ---
-        const finalBlendedImageBase64 = await editImageRegion(
-            imageForBlendingBase64,
-            currentImageFile.type,
-            blendingPrompt
-        );
+        // --- STAGE 3: Final Blend using GCS-based editing ---
+        const blendingResult = await editImageRegionFromTempStorage(tempImageIdForBlending, blendingPrompt);
+        
+        // Update tempImageId for future operations
+        setCurrentTempImageId(blendingResult.tempImageId);
 
         // --- STAGE 4: Update History ---
-        const finalImageUrl = `data:${currentImageFile.type};base64,${finalBlendedImageBase64}`;
+        finalImageUrl = blendingResult.imageUrl;
         const newFileBlob = await (await fetch(finalImageUrl)).blob();
-        const newFile = new File([newFileBlob], currentImageFile.name, {type: currentImageFile.type});
+        newFile = new File([newFileBlob], currentImageFile.name, {type: currentImageFile.type});
     
         const newHistory = history.slice(0, historyIndex + 1);
         newHistory.push(newFile);
@@ -636,10 +713,25 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
     setIsGeneratingOnStart(true);
     setError(null);
     try {
-      const base64Image = await generateImage(startScreenPrompt);
-      const blob = await (await fetch(`data:image/png;base64,${base64Image}`)).blob();
-      const newFile = new File([blob], "generated-image.png", { type: 'image/png' });
-      handleImageUpload(newFile);
+      const result = await generateImage(startScreenPrompt);
+      
+      // Handle new return format { imageUrl, tempImageId }
+      // Store the tempImageId for future editing operations
+      setCurrentTempImageId(result.tempImageId);
+      
+      if (result.imageUrl.startsWith('http')) {
+        // GCS URL - load directly
+        const response = await fetch(result.imageUrl);
+        const blob = await response.blob();
+        const newFile = new File([blob], "generated-image.png", { type: 'image/png' });
+        handleImageUpload(newFile);
+      } else {
+        // Base64 fallback
+        const base64Image = result.imageUrl.replace('data:image/png;base64,', '');
+        const blob = await (await fetch(`data:image/png;base64,${base64Image}`)).blob();
+        const newFile = new File([blob], "generated-image.png", { type: 'image/png' });
+        handleImageUpload(newFile);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'An unknown error occurred.');
     } finally {

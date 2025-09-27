@@ -100,12 +100,55 @@ query generateImageToImage {
 
 action generateImageWithGemini {
 	fn: import { generateImage } from "@src/server/gemini/gemini-service-operations",
-	entities: [Users]
+	entities: [Users, TempImage]
 }
 
 action editImageRegionWithGemini {
 	fn: import { editImageRegion } from "@src/server/gemini/gemini-service-operations",
 	entities: [Users]
+}
+
+// New upload operations
+action generateImageUploadUrl {
+	fn: import { generateImageUploadUrl } from "@src/server/image/upload-operations",
+	entities: [Users, TempImage]
+}
+
+action createTempImageRecord {
+	fn: import { createTempImageRecord } from "@src/server/image/upload-operations",
+	entities: [Users, TempImage]
+}
+
+// New processing operations
+action editImageRegionFromStorage {
+	fn: import { editImageRegionFromStorage } from "@src/server/gemini/gemini-service-operations",
+	entities: [Users, TempImage, Image, ImageEdit]
+}
+
+// New image management
+query getUserImages {
+	fn: import { getUserImages } from "@src/server/image/image-queries",
+	entities: [Users, Image, ImageEdit]
+}
+
+query getImageWithHistory {
+	fn: import { getImageWithHistory } from "@src/server/image/image-queries",
+	entities: [Users, Image, ImageEdit]
+}
+
+query getImageById {
+	fn: import { getImageById } from "@src/server/image/image-queries",
+	entities: [Users, Image]
+}
+
+action saveImagePermanently {
+	fn: import { saveImagePermanently } from "@src/server/image/image-operations",
+	entities: [Users, Image, TempImage, ImageEdit]
+}
+
+action createImageEdit {
+	fn: import { createImageEdit } from "@src/server/image/image-operations",
+	entities: [Users, Image, ImageEdit]
 }
 
 // Payment operations

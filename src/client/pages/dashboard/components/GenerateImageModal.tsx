@@ -6,7 +6,7 @@ import { ArrowRightIcon } from './icons/ArrowRightIcon';
 interface GenerateImageModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onGenerate: (base64Image: string) => void;
+  onGenerate: (result: { imageUrl: string; tempImageId: string }) => void;
 }
 
 export const GenerateImageModal: React.FC<GenerateImageModalProps> = ({ isOpen, onClose, onGenerate }) => {
@@ -19,8 +19,8 @@ export const GenerateImageModal: React.FC<GenerateImageModalProps> = ({ isOpen, 
     setIsLoading(true);
     setError(null);
     try {
-      const base64Image = await generateImage(prompt);
-      onGenerate(base64Image);
+      const result = await generateImage(prompt);
+      onGenerate(result);
       setPrompt('');
       onClose();
     } catch (e) {

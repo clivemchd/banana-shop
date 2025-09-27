@@ -14,4 +14,7 @@ Rules of the project:
 11. Do not add tyoe assertions
 12. Dont use wasp start the alternative for it is npm run dev
 13. Dont wasp build on dev the alternative for it is npm run dev
+14. When in agent mode provide a detailed plan on what you intend to do and suggest better alternatives and recommendations if available for me to approve before you start adding code.
+14. Do not provide fallbacks for user provided errors always fix that specific error
+
 

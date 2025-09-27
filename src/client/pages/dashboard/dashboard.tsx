@@ -20,14 +20,19 @@ export const DashboardPage = () => {
         setIsGenerateModalOpen(true);
     };
 
-    const handleImageGenerated = async (base64Image: string) => {
+    const handleImageGenerated = async (result: { imageUrl: string; tempImageId: string }) => {
         try {
-            // Convert base64 to File object
-            const blob = await (await fetch(`data:image/png;base64,${base64Image}`)).blob();
-            const newFile = new File([blob], "generated-image.png", { type: 'image/png' });
-
-            // Pass file to ImageAnalyzer
-            imageAnalyzerRef.current?.loadImageFile(newFile);
+            // For GCS URLs, we can load them directly
+            if (result.imageUrl.startsWith('http')) {
+                // Pass URL directly to ImageAnalyzer
+                imageAnalyzerRef.current?.loadImageUrl(result.imageUrl, result.tempImageId);
+            } else {
+                // Fallback for base64 (legacy support)
+                const base64Image = result.imageUrl.replace('data:image/png;base64,', '');
+                const blob = await (await fetch(`data:image/png;base64,${base64Image}`)).blob();
+                const newFile = new File([blob], "generated-image.png", { type: 'image/png' });
+                imageAnalyzerRef.current?.loadImageFile(newFile);
+            }
         } catch (e) {
             setError("Failed to process the generated image.");
             console.error(e);
