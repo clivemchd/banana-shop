@@ -12,4 +12,6 @@ Rules of the project:
 9. Do not use require to load modules
 10. never use as any type assertion
 11. Do not add tyoe assertions
+12. Dont use wasp start the alternative for it is npm run dev
+13. Dont wasp build on dev the alternative for it is npm run dev
 

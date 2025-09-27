@@ -98,6 +98,16 @@ query generateImageToImage {
 	entities: [Users]
 }
 
+action generateImageWithGemini {
+	fn: import { generateImage } from "@src/server/gemini/gemini-service-operations",
+	entities: [Users]
+}
+
+action editImageRegionWithGemini {
+	fn: import { editImageRegion } from "@src/server/gemini/gemini-service-operations",
+	entities: [Users]
+}
+
 // Payment operations
 action generateCheckoutSession {
 	fn: import { generateCheckoutSession } from "@src/server/payment/operations",
