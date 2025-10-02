@@ -102,7 +102,7 @@ const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string
             
             {/* Menu Items */}
             <div className="py-1">
-              <button
+              {/* <button
                 onClick={() => {
                   setIsOpen(false);
                   // TODO: Navigate to account page
@@ -111,7 +111,7 @@ const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string
               >
                 <SquareUser className="h-4 w-4" />
                 Account Settings
-              </button>
+              </button> */}
               
               <button
                 onClick={() => {
@@ -278,7 +278,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
               
               {/* Menu Items */}
               <div className="space-y-2">
-                <Button
+                {/* <Button
                   variant="ghost"
                   className="w-full justify-start gap-2"
                   onClick={() => {
@@ -288,7 +288,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
                 >
                   <SquareUser className="h-4 w-4" />
                   Account Settings
-                </Button>
+                </Button> */}
                 
                 <Button
                   variant="ghost"

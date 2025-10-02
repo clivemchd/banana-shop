@@ -50,38 +50,36 @@ export const DashboardPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="h-screen bg-background flex flex-col overflow-hidden">
             <Navbar />
-            <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-8">
-                <div className="min-h-screen bg-white text-black flex flex-col h-screen antialiased">
-                    <header className="w-full bg-white border-b border-neutral-200 px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0 z-30">
-                        {isImageLoaded && (
-                            <div className="flex items-center space-x-2 sm:space-x-4">
-                                <button
-                                    onClick={handleGenerateNew}
-                                    className="px-4 py-2 bg-black text-white text-sm font-semibold rounded-md hover:bg-neutral-800 active:bg-neutral-700 transition-colors duration-200 flex items-center"
-                                >
-                                    <SparklesIcon className="w-4 h-4 mr-2" />
-                                    Generate New Image
-                                </button>
-                                <button
-                                    onClick={handleUploadNew}
-                                    className="px-4 py-2 border border-neutral-300 bg-white text-black text-sm font-semibold rounded-md hover:bg-neutral-100 active:bg-neutral-200 transition-colors duration-200"
-                                >
-                                    Upload New Image
-                                </button>
-                            </div>
-                        )}
+            <div className="flex-1 bg-white text-black flex flex-col overflow-hidden antialiased">
+                {isImageLoaded && (
+                    <header className="w-full bg-white border-b border-neutral-200 px-4 sm:px-6 py-3 flex items-center justify-end flex-shrink-0 z-30">
+                        <div className="flex items-center space-x-2 sm:space-x-4">
+                            <button
+                                onClick={handleGenerateNew}
+                                className="px-4 py-2 bg-black text-white text-sm font-semibold rounded-md hover:bg-neutral-800 active:bg-neutral-700 transition-colors duration-200 flex items-center"
+                            >
+                                <SparklesIcon className="w-4 h-4 mr-2" />
+                                Generate New Image
+                            </button>
+                            <button
+                                onClick={handleUploadNew}
+                                className="px-4 py-2 border border-neutral-300 bg-white text-black text-sm font-semibold rounded-md hover:bg-neutral-100 active:bg-neutral-200 transition-colors duration-200"
+                            >
+                                Upload New Image
+                            </button>
+                        </div>
                     </header>
-                    <main className="w-full flex-grow flex overflow-hidden">
-                        <ImageAnalyzer ref={imageAnalyzerRef} onImageStateChange={setIsImageLoaded} />
-                    </main>
-                    <GenerateImageModal
-                        isOpen={isGenerateModalOpen}
-                        onClose={() => setIsGenerateModalOpen(false)}
-                        onGenerate={handleImageGenerated}
-                    />
-                </div>
+                )}
+                <main className="flex-1 w-full overflow-hidden">
+                    <ImageAnalyzer ref={imageAnalyzerRef} onImageStateChange={setIsImageLoaded} />
+                </main>
+                <GenerateImageModal
+                    isOpen={isGenerateModalOpen}
+                    onClose={() => setIsGenerateModalOpen(false)}
+                    onGenerate={handleImageGenerated}
+                />
             </div>
         </div>
     )
