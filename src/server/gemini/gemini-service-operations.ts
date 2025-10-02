@@ -25,7 +25,7 @@ const getAiInstance = () => {
     return ai;
 };
 
-export const generateImage = async (args: GenerateImageArgs, context: any): Promise<{ imageUrl: string; tempImageId: string }> => {
+export const generateImage = async (args: GenerateImageArgs, context: any): Promise<{ imageUrl: string; imageId: string }> => {
     const ai = getAiInstance();
     const { prompt } = args;
     try {
@@ -43,18 +43,44 @@ export const generateImage = async (args: GenerateImageArgs, context: any): Prom
         const candidate = response?.candidates?.[0];
 
         if (!candidate) {
-            console.error("Invalid response from Gemini API for image generation.", { response });
-            throw new Error("The model did not return a valid response.");
+            console.error("Invalid response from Gemini API for image generation.", { 
+                prompt,
+                response: JSON.stringify(response, null, 2) 
+            });
+            throw new Error("The AI model did not return a valid response. Please try again.");
         }
 
         if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-             throw new Error(`Image generation failed. Reason: ${candidate.finishReason}. This can happen due to safety policies or an invalid prompt.`);
+            const reason = candidate.finishReason;
+            console.error(`Gemini API returned finishReason during generation: ${reason}`, {
+                prompt,
+                candidate: JSON.stringify(candidate, null, 2)
+            });
+            
+            let errorMessage = 'Image generation failed. ';
+            
+            switch (reason) {
+                case 'SAFETY':
+                    errorMessage += 'The prompt was blocked by safety filters. Please try a different description.';
+                    break;
+                case 'RECITATION':
+                    errorMessage += 'The prompt may reference copyrighted content. Please use original ideas.';
+                    break;
+                case 'MAX_TOKENS':
+                case 'OTHER':
+                    errorMessage += 'Unable to generate the image. Try simplifying your prompt or using different words.';
+                    break;
+                default:
+                    errorMessage += `Unexpected error (${reason}). Please try again with a different prompt.`;
+            }
+            
+            throw new Error(errorMessage);
         }
         
         const imagePartData = candidate.content?.parts?.find(part => part.inlineData)?.inlineData?.data;
 
         if (imagePartData) {
-            // Upload generated image to GCS and create temp image record
+            // Upload generated image to GCS ROOT (no folders)
             const storage = new Storage({
                 projectId: process.env.GCP_PROJECT_ID,
                 keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
@@ -66,7 +92,8 @@ export const generateImage = async (args: GenerateImageArgs, context: any): Prom
             }
             
             const bucket = storage.bucket(bucketName);
-            const fileName = `generated-images/${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
+            // Upload directly to root - no folders
+            const fileName = `${context.user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
             const file = bucket.file(fileName);
             
             // Convert base64 to buffer
@@ -79,40 +106,53 @@ export const generateImage = async (args: GenerateImageArgs, context: any): Prom
                 },
             });
             
-            // Generate public URL
-            const [url] = await file.getSignedUrl({
+            // Generate SIGNED URL (24 hour expiry - private, user-specific)
+            const [signedUrl] = await file.getSignedUrl({
+                version: 'v4',
                 action: 'read',
                 expires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
             });
             
-            // Create temp image record
-            const tempImage = await context.entities.TempImage.create({
+            // Create Image record in database
+            const image = await context.entities.Image.create({
                 data: {
-                    id: `temp-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-                    url: url,
+                    url: signedUrl,
                     fileName: fileName,
                     mimeType: 'image/png',
-                    size: imageBuffer.length,
-                    userId: context.user?.id || null,
-                    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+                    description: prompt,
+                    userId: context.user.id,
                 },
             });
             
             return {
-                imageUrl: url,
-                tempImageId: tempImage.id
+                imageUrl: signedUrl,
+                imageId: image.id
             };
         }
 
         console.error("No image part found in the response for image generation. Full response:", JSON.stringify(response, null, 2));
-        throw new Error("The model response did not contain an image. This might be because the prompt was too ambiguous or couldn't be fulfilled.");
+        throw new Error("The AI did not generate an image. Try a different prompt or simplify your description.");
 
     } catch (error) {
-        console.error("Error generating image with Gemini API:", error);
-        if (error instanceof Error && error.message.includes('SAFETY')) {
-             throw new Error(`Image generation failed due to safety policies. Please try a different prompt.`);
+        console.error("Error generating image with Gemini API:", {
+            error,
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            prompt
+        });
+        
+        // If it's already a user-friendly error message, throw it as-is
+        if (error instanceof Error && (
+            error.message.includes('safety filters') ||
+            error.message.includes('copyrighted content') ||
+            error.message.includes('Unable to') ||
+            error.message.includes('AI model') ||
+            error.message.includes('AI did not')
+        )) {
+            throw error;
         }
-        throw error;
+        
+        // For unexpected errors, throw a generic message
+        throw new Error('Failed to generate image. Please try again or use a different prompt.');
     }
 };
 
@@ -172,28 +212,35 @@ export interface EditImageFromStorageArgs {
   prompt: string;
 }
 
-export const editImageRegionFromStorage = async (
-  args: EditImageFromStorageArgs,
+export interface EditImageFromGCSArgs {
+  imageId: string;
+  prompt: string;
+  shouldBlend?: boolean;
+  borderColor?: string;
+}
+
+export const editImageFromGCS = async (
+  args: EditImageFromGCSArgs,
   context: any
-): Promise<{ imageUrl: string; tempImageId: string }> => {
+): Promise<{ imageUrl: string; imageId: string }> => {
   if (!context.user) {
     throw new Error('User must be authenticated');
   }
 
-  const { tempImageId, prompt } = args;
+  const { imageId, prompt, shouldBlend, borderColor } = args;
 
   try {
-    // Find the temp image
-    const tempImage = await context.entities.TempImage.findUnique({
-      where: { id: tempImageId },
+    // Find the image record
+    const image = await context.entities.Image.findUnique({
+      where: { id: imageId },
     });
 
-    if (!tempImage) {
-      throw new Error('Temp image not found');
+    if (!image) {
+      throw new Error('Image not found');
     }
 
-    if (tempImage.userId !== context.user.id) {
-      throw new Error('Unauthorized access to temp image');
+    if (image.userId !== context.user.id) {
+      throw new Error('Unauthorized access to image');
     }
 
     // Download image from GCS
@@ -206,59 +253,116 @@ export const editImageRegionFromStorage = async (
     if (!bucketName) {
         throw new Error('GCP_BUCKET_NAME environment variable is not set');
     }
-    if (!bucketName) {
-        throw new Error('GCS_BUCKET_NAME environment variable is not set');
-    }
     
     const bucket = storage.bucket(bucketName);
-    const file = bucket.file(tempImage.fileName);
+    const file = bucket.file(image.fileName);
     
     // Download the image
     const [imageBuffer] = await file.download();
     const base64Image = imageBuffer.toString('base64');
+    
+    // Determine the final prompt based on blending flag
+    let finalPrompt = prompt;
+    let temperature = 0.4;
+    
+    if (shouldBlend && borderColor) {
+      // Simplified blending prompt to avoid safety filters
+      finalPrompt = `Smooth and blend the ${borderColor} border line into the surrounding image. Remove the ${borderColor} line completely while preserving all image content.`;
+    }
     
     // Process with Gemini API
     const ai = getAiInstance();
     const imagePart = {
       inlineData: {
         data: base64Image,
-        mimeType: tempImage.mimeType,
+        mimeType: image.mimeType,
       },
     };
-    const textPart = { text: prompt };
+    const textPart = { text: finalPrompt };
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image-preview',
       contents: { parts: [imagePart, textPart] },
       config: {
         responseModalities: [Modality.IMAGE, Modality.TEXT],
-        temperature: 0.4,
-        systemInstruction: `
-          Ensure to change the image as requested while maintaining the overall structure and return the modified image.
-        `
+        temperature: temperature,
+        systemInstruction: `Ensure to change the cropped image as it is in structure and return the same exact image with the specified modifications.`
       },
     });
 
     const candidate = response?.candidates?.[0];
 
     if (!candidate) {
-      console.error("Invalid response from Gemini API for image editing.", { response });
-      throw new Error("The model did not return a valid response.");
+      console.error("Invalid response from Gemini API for image editing.", { 
+        imageId, 
+        shouldBlend, 
+        borderColor,
+        promptLength: finalPrompt.length,
+        response: JSON.stringify(response, null, 2)
+      });
+      throw new Error("The AI model did not return a valid response. Please try again.");
     }
 
     if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-      throw new Error(`Image editing failed. Reason: ${candidate.finishReason}. This can happen due to safety policies or an invalid prompt.`);
+      const reason = candidate.finishReason;
+      console.error(`Gemini API returned finishReason: ${reason}`, {
+        imageId,
+        shouldBlend,
+        borderColor,
+        prompt: finalPrompt,
+        candidate: JSON.stringify(candidate, null, 2)
+      });
+      
+      // Provide user-friendly error messages based on finish reason
+      let errorMessage = 'Image editing failed. ';
+      
+      switch (reason) {
+        case 'SAFETY':
+          errorMessage += shouldBlend 
+            ? 'The blending operation was blocked by safety filters. This may be due to the image content. Please try uploading a different image.'
+            : 'The edit was blocked by safety filters. Please try a different edit prompt or upload a different image.';
+          break;
+        case 'RECITATION':
+          errorMessage += 'The AI detected potential copyrighted content. Please use original images.';
+          break;
+        case 'MAX_TOKENS':
+        case 'OTHER':
+        case 'IMAGE_OTHER':
+          errorMessage += shouldBlend
+            ? 'Unable to blend the image edges. This sometimes happens with complex images. Try selecting a smaller region or simplifying the edit.'
+            : 'Unable to complete the edit. Please try a simpler edit prompt or a smaller selection area.';
+          break;
+        default:
+          errorMessage += `Unexpected error (${reason}). Please try again with a different approach.`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const editedImageData = candidate.content?.parts?.find(part => part.inlineData)?.inlineData?.data;
     
     if (!editedImageData) {
-      throw new Error("The model response did not contain an edited image.");
+      console.error("No image data in Gemini response", {
+        imageId,
+        shouldBlend,
+        borderColor,
+        candidateParts: candidate.content?.parts?.length || 0
+      });
+      throw new Error("The AI did not return an edited image. Please try again.");
     }
 
-    // Upload edited image to GCS
-    const editedFileName = `edited-images/${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
-    const editedFile = bucket.file(editedFileName);
+    // Delete old file from GCS (cleanup)
+    try {
+      const oldFile = bucket.file(image.fileName);
+      await oldFile.delete();
+    } catch (deleteError) {
+      console.warn(`Failed to delete old file ${image.fileName}:`, deleteError);
+      // Continue even if delete fails
+    }
+
+    // Upload edited image to GCS ROOT (no folders) - REPLACE old file
+    const newFileName = `${context.user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
+    const editedFile = bucket.file(newFileName);
     const editedImageBuffer = Buffer.from(editedImageData, 'base64');
     
     await editedFile.save(editedImageBuffer, {
@@ -267,31 +371,49 @@ export const editImageRegionFromStorage = async (
       },
     });
     
-    // Generate public URL
-    const [editedUrl] = await editedFile.getSignedUrl({
+    // Generate SIGNED URL (24 hour expiry - private, user-specific)
+    const [signedUrl] = await editedFile.getSignedUrl({
+      version: 'v4',
       action: 'read',
       expires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
     });
     
-    // Create new temp image record for edited image
-    const editedTempImage = await context.entities.TempImage.create({
+    // UPDATE existing Image record (replace URL and filename)
+    const updatedImage = await context.entities.Image.update({
+      where: { id: imageId },
       data: {
-        id: `edited-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-        url: editedUrl,
-        fileName: editedFileName,
-        mimeType: 'image/png',
-        size: editedImageBuffer.length,
-        userId: context.user.id,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        url: signedUrl,
+        fileName: newFileName,
+        description: prompt,
+        updatedAt: new Date(),
       },
     });
     
     return {
-      imageUrl: editedUrl,
-      tempImageId: editedTempImage.id
+      imageUrl: signedUrl,
+      imageId: updatedImage.id
     };
   } catch (error) {
-    console.error('Error editing image from storage:', error);
-    throw new Error('Failed to edit image from storage');
+    console.error('Error editing image from GCS:', {
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      imageId,
+      shouldBlend,
+      borderColor
+    });
+    
+    // If it's already a user-friendly error message, throw it as-is
+    if (error instanceof Error && (
+      error.message.includes('safety filters') ||
+      error.message.includes('copyrighted content') ||
+      error.message.includes('Unable to') ||
+      error.message.includes('AI model') ||
+      error.message.includes('AI did not')
+    )) {
+      throw error;
+    }
+    
+    // For unexpected errors, throw a generic message
+    throw new Error('Failed to edit image. Please try again or contact support if the issue persists.');
   }
 };

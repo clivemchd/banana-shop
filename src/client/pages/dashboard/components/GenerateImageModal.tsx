@@ -6,7 +6,7 @@ import { ArrowRightIcon } from './icons/ArrowRightIcon';
 interface GenerateImageModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onGenerate: (result: { imageUrl: string; tempImageId: string }) => void;
+  onGenerate: (result: { imageUrl: string; imageId: string }) => void;
 }
 
 export const GenerateImageModal: React.FC<GenerateImageModalProps> = ({ isOpen, onClose, onGenerate }) => {

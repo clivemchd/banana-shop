@@ -8,41 +8,61 @@ const storage = new Storage({
 
 const bucket = storage.bucket(process.env.GCP_BUCKET_NAME!);
 
-export interface GenerateImageUploadUrlArgs {
+export interface GeneratePresignedUploadUrlArgs {
   fileName: string;
   mimeType: string;
+  imageId?: string; // Optional: if provided, will update existing image
 }
 
-export interface CreateTempImageRecordArgs {
+export interface ConfirmImageUploadArgs {
+  imageId?: string; // Optional: if provided, updates existing record
   fileName: string;
-  mimeType: string;
   gcsFileName: string;
-  size: number;
+  mimeType: string;
 }
 
-export const generateImageUploadUrl = async (
-  args: GenerateImageUploadUrlArgs,
+/**
+ * Generate presigned URL for uploading to GCS
+ * Client will use this URL to upload file directly to GCS
+ */
+export const generatePresignedUploadUrl = async (
+  args: GeneratePresignedUploadUrlArgs,
   context: any
-): Promise<{ uploadUrl: string; fileName: string }> => {
+): Promise<{ uploadUrl: string; gcsFileName: string; imageId?: string }> => {
   if (!context.user) {
     throw new Error('User must be authenticated');
   }
 
-  const { fileName, mimeType } = args;
-  
-  // Validate file type
-  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-  if (!allowedTypes.includes(mimeType)) {
-    throw new Error(`Unsupported file type: ${mimeType}`);
-  }
-
-  // Generate unique filename with user prefix
-  const timestamp = Date.now();
-  const uniqueFileName = `temp/${context.user.id}/${timestamp}-${fileName}`;
+  const { fileName, mimeType, imageId } = args;
 
   try {
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(mimeType)) {
+      throw new Error(`Unsupported file type: ${mimeType}`);
+    }
+
+    // If updating existing image, delete old file first
+    if (imageId) {
+      const existingImage = await context.entities.Image.findUnique({
+        where: { id: imageId },
+      });
+
+      if (existingImage && existingImage.userId === context.user.id) {
+        try {
+          const oldFile = bucket.file(existingImage.fileName);
+          await oldFile.delete();
+        } catch (deleteError) {
+          console.warn(`Failed to delete old file ${existingImage.fileName}:`, deleteError);
+        }
+      }
+    }
+
+    // Generate unique filename - directly in root (no folders)
+    const gcsFileName = `${context.user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}-${fileName}`;
+
     // Generate presigned URL for upload (expires in 15 minutes)
-    const [url] = await bucket.file(uniqueFileName).getSignedUrl({
+    const [uploadUrl] = await bucket.file(gcsFileName).getSignedUrl({
       version: 'v4',
       action: 'write',
       expires: Date.now() + 15 * 60 * 1000, // 15 minutes
@@ -50,118 +70,72 @@ export const generateImageUploadUrl = async (
     });
 
     return {
-      uploadUrl: url,
-      fileName: uniqueFileName,
+      uploadUrl,
+      gcsFileName,
+      imageId,
     };
   } catch (error) {
-    console.error('Error generating upload URL:', error);
-    throw new Error('Failed to generate upload URL');
+    console.error('Error generating presigned upload URL:', error);
+    throw new Error('Failed to generate presigned upload URL');
   }
 };
 
-export const createTempImageRecord = async (
-  args: CreateTempImageRecordArgs,
+/**
+ * Confirm upload and create/update Image record with signed URL
+ * Call this after client successfully uploads to presigned URL
+ */
+export const confirmImageUpload = async (
+  args: ConfirmImageUploadArgs,
   context: any
-): Promise<{ id: string; url: string }> => {
+): Promise<{ imageUrl: string; imageId: string }> => {
   if (!context.user) {
     throw new Error('User must be authenticated');
   }
 
-  const { fileName, mimeType, gcsFileName, size } = args;
+  const { imageId, fileName, gcsFileName, mimeType } = args;
 
   try {
-    // Create public URL for the uploaded file
-    const publicUrl = `https://storage.googleapis.com/${process.env.GCP_BUCKET_NAME}/${gcsFileName}`;
-    
-    // Set expiration time (24 hours from now)
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+    const file = bucket.file(gcsFileName);
 
-    // Create temp image record in database
-    const tempImage = await context.entities.TempImage.create({
-      data: {
-        url: publicUrl,
-        fileName: fileName,
-        mimeType: mimeType,
-        size: size,
-        userId: context.user.id,
-        expiresAt: expiresAt,
-      },
+    // Generate SIGNED URL for reading (24 hour expiry - private, user-specific)
+    const [signedUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
     });
 
-    return {
-      id: tempImage.id,
-      url: tempImage.url,
-    };
-  } catch (error) {
-    console.error('Error creating temp image record:', error);
-    throw new Error('Failed to create temp image record');
-  }
-};
+    let image;
 
-export const cleanupExpiredTempImages = async (context: any): Promise<void> => {
-  try {
-    const now = new Date();
-    
-    // Find expired temp images
-    const expiredImages = await context.entities.TempImage.findMany({
-      where: {
-        expiresAt: {
-          lt: now,
+    if (imageId) {
+      // UPDATE existing Image record
+      image = await context.entities.Image.update({
+        where: { id: imageId },
+        data: {
+          url: signedUrl,
+          fileName: gcsFileName,
+          mimeType: mimeType,
+          updatedAt: new Date(),
         },
-      },
-    });
-
-    // Delete files from GCS and database records
-    for (const tempImage of expiredImages) {
-      try {
-        // Extract filename from URL
-        const urlParts = tempImage.url.split('/');
-        const fileName = urlParts.slice(-2).join('/'); // Get last two parts (folder/filename)
-        
-        // Delete from GCS
-        await bucket.file(fileName).delete();
-        console.log(`Deleted GCS file: ${fileName}`);
-      } catch (gcsError) {
-        console.error(`Failed to delete GCS file for temp image ${tempImage.id}:`, gcsError);
-        // Continue with database cleanup even if GCS deletion fails
-      }
+      });
+    } else {
+      // CREATE new Image record
+      image = await context.entities.Image.create({
+        data: {
+          url: signedUrl,
+          fileName: gcsFileName,
+          mimeType: mimeType,
+          description: fileName,
+          userId: context.user.id,
+        },
+      });
     }
 
-    // Delete database records
-    const deletedCount = await context.entities.TempImage.deleteMany({
-      where: {
-        expiresAt: {
-          lt: now,
-        },
-      },
-    });
-
-    console.log(`Cleaned up ${deletedCount.count} expired temp images`);
+    return {
+      imageUrl: signedUrl,
+      imageId: image.id,
+    };
   } catch (error) {
-    console.error('Error during temp image cleanup:', error);
-    throw error;
+    console.error('Error confirming image upload:', error);
+    throw new Error('Failed to confirm image upload');
   }
-};
-
-export const validateImageUpload = (file: File): { isValid: boolean; error?: string } => {
-  // File type validation
-  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-  if (!allowedTypes.includes(file.type)) {
-    return {
-      isValid: false,
-      error: `Unsupported file type: ${file.type}. Allowed types: ${allowedTypes.join(', ')}`,
-    };
-  }
-
-  // File size validation (50MB max)
-  const maxSize = 50 * 1024 * 1024; // 50MB
-  if (file.size > maxSize) {
-    return {
-      isValid: false,
-      error: `File size too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum allowed: 50MB`,
-    };
-  }
-
-  return { isValid: true };
 };

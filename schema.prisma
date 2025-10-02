@@ -10,7 +10,7 @@ generator client {
 model Image {
 	id          String   @id @default(uuid())
 	url         String   // Final GCS URL
-	originalUrl String?  // Original image URL (if uploaded)
+	// originalUrl String?  // Original image URL (if uploaded)
 	description String?  // User-provided or AI-generated description
 	fileName    String   // Display name
 	mimeType    String   // image/png, image/jpeg, etc.
@@ -21,14 +21,14 @@ model Image {
 	updatedAt   DateTime @updatedAt
 	
 	// Link to edit history
-	editHistory ImageEdit[]
+	// editHistory ImageEdit[]
 }
 
 model Users {
 	id String @id @default(uuid())
 	images Image[]
-	tempImages TempImage[]
-	imageEdits ImageEdit[]
+	// tempImages TempImage[]
+	// imageEdits ImageEdit[]
 	isAdmin  Boolean @default(false)
 	email String @unique
 	name String? 
@@ -48,27 +48,27 @@ model Users {
 	scheduledStartDate DateTime? // When the scheduled plan will start
 }
 
-model TempImage {
-	id        String   @id @default(uuid())
-	url       String   // Temporary GCS URL
-	fileName  String   
-	mimeType  String   
-	size      Int      // File size in bytes
-	userId    String?  // Allow nullable for unauthenticated users
-	user      Users?   @relation(fields: [userId], references: [id])
-	createdAt DateTime @default(now())
-	expiresAt DateTime // Auto-cleanup after 24 hours
-}
+// model TempImage {
+// 	id        String   @id @default(uuid())
+// 	url       String   // Temporary GCS URL
+// 	fileName  String   
+// 	mimeType  String   
+// 	size      Int      // File size in bytes
+// 	userId    String?  // Allow nullable for unauthenticated users
+// 	user      Users?   @relation(fields: [userId], references: [id])
+// 	createdAt DateTime @default(now())
+// 	expiresAt DateTime // Auto-cleanup after 24 hours
+// }
 
-model ImageEdit {
-	id          String   @id @default(uuid())
-	imageId     String
-	image       Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
-	editType    String   // 'generation', 'region_edit', 'filter', etc.
-	prompt      String?  // The prompt used for this edit
-	beforeUrl   String?  // Image state before this edit
-	afterUrl    String   // Image state after this edit
-	userId      String
-	user        Users    @relation(fields: [userId], references: [id])
-	createdAt   DateTime @default(now())
-}
+// model ImageEdit {
+// 	id          String   @id @default(uuid())
+// 	imageId     String
+// 	image       Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+// 	editType    String   // 'generation', 'region_edit', 'filter', etc.
+// 	prompt      String?  // The prompt used for this edit
+// 	beforeUrl   String?  // Image state before this edit
+// 	afterUrl    String   // Image state after this edit
+// 	userId      String
+// 	user        Users    @relation(fields: [userId], references: [id])
+// 	createdAt   DateTime @default(now())
+// }

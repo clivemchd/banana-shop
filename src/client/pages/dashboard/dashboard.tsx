@@ -20,12 +20,12 @@ export const DashboardPage = () => {
         setIsGenerateModalOpen(true);
     };
 
-    const handleImageGenerated = async (result: { imageUrl: string; tempImageId: string }) => {
+    const handleImageGenerated = async (result: { imageUrl: string; imageId: string }) => {
         try {
             // For GCS URLs, we can load them directly
             if (result.imageUrl.startsWith('http')) {
-                // Pass URL directly to ImageAnalyzer
-                imageAnalyzerRef.current?.loadImageUrl(result.imageUrl, result.tempImageId);
+                // Pass URL directly to ImageAnalyzer with imageId
+                imageAnalyzerRef.current?.loadImageUrl(result.imageUrl, result.imageId);
             } else {
                 // Fallback for base64 (legacy support)
                 const base64Image = result.imageUrl.replace('data:image/png;base64,', '');
