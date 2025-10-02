@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { generateImage } from '../services/gemini-service';
+import type { UserSubscriptionInfo } from '../../../utils/subscription-validator';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { ArrowRightIcon } from './icons/ArrowRightIcon';
 
@@ -7,19 +8,26 @@ interface GenerateImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGenerate: (result: { imageUrl: string; imageId: string }) => void;
+  userInfo: UserSubscriptionInfo | null;
 }
 
-export const GenerateImageModal: React.FC<GenerateImageModalProps> = ({ isOpen, onClose, onGenerate }) => {
+export const GenerateImageModal: React.FC<GenerateImageModalProps> = ({ isOpen, onClose, onGenerate, userInfo }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
+    
+    if (!userInfo) {
+      setError('Unable to verify your account. Please refresh the page.');
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     try {
-      const result = await generateImage(prompt);
+      const result = await generateImage(prompt, userInfo);
       onGenerate(result);
       setPrompt('');
       onClose();

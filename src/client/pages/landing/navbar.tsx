@@ -157,7 +157,7 @@ const CreditsDisplay = ({ showOnPaths = [] }: { showOnPaths?: string[] }) => {
 
   return (
     <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-accent/50 rounded-full border">
-      <Zap className="h-4 w-4 text-yellow-500" />
+      <Zap className="h-4 w-4" />
       <span className="text-sm font-medium">
         {subscription.credits || 0}
       </span>

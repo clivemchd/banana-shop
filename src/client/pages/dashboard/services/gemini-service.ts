@@ -2,11 +2,26 @@ import {
   generateImageWithGemini,
   generatePresignedUploadUrl,
   confirmImageUpload,
-  editImageFromGCS as editImageFromGCSAction
+  editImageFromGCS as editImageFromGCSAction,
+  getCurrentUserCredits
 } from 'wasp/client/operations';
+import { validateSubscriptionAndCredits, CREDIT_COSTS, type UserSubscriptionInfo } from '../../../utils/subscription-validator';
 
-export const generateImage = async (prompt: string): Promise<{ imageUrl: string; imageId: string }> => {
+export const generateImage = async (
+  prompt: string, 
+  userInfo: UserSubscriptionInfo
+): Promise<{ imageUrl: string; imageId: string }> => {
   try {
+    // Validate subscription and credits on client-side first
+    const validation = await validateSubscriptionAndCredits(
+      CREDIT_COSTS.IMAGE_GENERATION,
+      userInfo
+    );
+
+    if (!validation.isValid) {
+      throw new Error(validation.error);
+    }
+
     const result = await generateImageWithGemini({ prompt });
     return result as { imageUrl: string; imageId: string };
   } catch (error) {
@@ -67,14 +82,29 @@ export const uploadImageToGCS = async (
  * @param prompt - The user prompt for editing
  * @param shouldBlend - If true, server will use blending prompt instead
  * @param borderColor - Color name for blending (required if shouldBlend is true)
+ * @param userInfo - User subscription and credit info (only validate if NOT blending)
  */
 export const editImageFromGCS = async (
   imageId: string, 
   prompt: string,
   shouldBlend?: boolean,
-  borderColor?: string
+  borderColor?: string,
+  userInfo?: UserSubscriptionInfo
 ): Promise<{ imageUrl: string; imageId: string }> => {
   try {
+    // Only validate on client-side for non-blending operations
+    // Blending is the second step and doesn't need validation (already checked)
+    if (!shouldBlend && userInfo) {
+      const validation = await validateSubscriptionAndCredits(
+        CREDIT_COSTS.IMAGE_EDIT,
+        userInfo
+      );
+
+      if (!validation.isValid) {
+        throw new Error(validation.error);
+      }
+    }
+
     const result = await editImageFromGCSAction({ 
       imageId, 
       prompt,

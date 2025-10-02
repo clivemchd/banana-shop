@@ -1,16 +1,63 @@
 import "../../../index.css";
 import Navbar from "../landing/navbar";
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useAuth } from 'wasp/client/auth';
+import { getCurrentUserCredits } from 'wasp/client/operations';
 import { ImageAnalyzer, ImageAnalyzerHandles } from './components/ImageAnalyzer';
 import { GenerateImageModal } from './components/GenerateImageModal';
 import { SparklesIcon } from './components/icons/SparklesIcon';
+import type { UserSubscriptionInfo } from '../../utils/subscription-validator';
 
 
 export const DashboardPage = () => {
+    const { data: user } = useAuth();
     const imageAnalyzerRef = useRef<ImageAnalyzerHandles>(null);
     const [error, setError] = useState<string | null>(null);
     const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
     const [isImageLoaded, setIsImageLoaded] = useState(false);
+    const [userInfo, setUserInfo] = useState<UserSubscriptionInfo | null>(null);
+    const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(true);
+
+    // Fetch user subscription and credit info
+    useEffect(() => {
+        const fetchUserInfo = async () => {
+            if (!user) {
+                setIsLoadingUserInfo(false);
+                return;
+            }
+
+            try {
+                const creditsData = await getCurrentUserCredits();
+                setUserInfo({
+                    subscriptionStatus: (user as any).subscriptionStatus || null,
+                    subscriptionPlan: (user as any).subscriptionPlan || null,
+                    credits: creditsData.credits || 0,
+                });
+            } catch (err) {
+                console.error('Failed to fetch user info:', err);
+                setError('Failed to load user information. Please refresh the page.');
+            } finally {
+                setIsLoadingUserInfo(false);
+            }
+        };
+
+        fetchUserInfo();
+    }, [user]);
+
+    // Refresh credits after any operation
+    const refreshCredits = useCallback(async () => {
+        if (!user) return;
+        
+        try {
+            const creditsData = await getCurrentUserCredits();
+            setUserInfo(prev => prev ? {
+                ...prev,
+                credits: creditsData.credits || 0,
+            } : null);
+        } catch (err) {
+            console.error('Failed to refresh credits:', err);
+        }
+    }, [user]);
 
     const handleUploadNew = () => {
         imageAnalyzerRef.current?.resetAndUpload();
@@ -33,11 +80,22 @@ export const DashboardPage = () => {
                 const newFile = new File([blob], "generated-image.png", { type: 'image/png' });
                 imageAnalyzerRef.current?.loadImageFile(newFile);
             }
+            
+            // Refresh credits after generation
+            await refreshCredits();
         } catch (e) {
             setError("Failed to process the generated image.");
             console.error(e);
         }
     };
+
+    if (isLoadingUserInfo) {
+        return (
+            <div className="h-screen bg-background flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-dashed rounded-full animate-spin border-black"></div>
+            </div>
+        );
+    }
 
     if (error) {
         return (
@@ -73,12 +131,18 @@ export const DashboardPage = () => {
                     </header>
                 )}
                 <main className="flex-1 w-full overflow-hidden">
-                    <ImageAnalyzer ref={imageAnalyzerRef} onImageStateChange={setIsImageLoaded} />
+                    <ImageAnalyzer 
+                        ref={imageAnalyzerRef} 
+                        onImageStateChange={setIsImageLoaded}
+                        userInfo={userInfo}
+                        onCreditUpdate={refreshCredits}
+                    />
                 </main>
                 <GenerateImageModal
                     isOpen={isGenerateModalOpen}
                     onClose={() => setIsGenerateModalOpen(false)}
                     onGenerate={handleImageGenerated}
+                    userInfo={userInfo}
                 />
             </div>
         </div>

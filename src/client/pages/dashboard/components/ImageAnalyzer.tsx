@@ -1,6 +1,7 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
 import type { SelectionRectangle } from '../types';
 import { generateImage, uploadImageToGCS, editImageFromGCS } from '../services/gemini-service';
+import type { UserSubscriptionInfo } from '../../../utils/subscription-validator';
 import { UploadIcon } from './icons/UploadIcon';
 import { ArrowRightIcon } from './icons/ArrowRightIcon';
 import { UndoIcon } from './icons/UndoIcon';
@@ -120,10 +121,12 @@ export interface ImageAnalyzerHandles {
 
 interface ImageAnalyzerProps {
   onImageStateChange?: (isLoaded: boolean) => void;
+  userInfo: UserSubscriptionInfo | null;
+  onCreditUpdate?: () => Promise<void>;
 }
 
 export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps>((props, ref) => {
-  const { onImageStateChange } = props;
+  const { onImageStateChange, userInfo, onCreditUpdate } = props;
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
   const [currentImageId, setCurrentImageId] = useState<string | null>(null);
@@ -537,6 +540,11 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
         return;
     }
 
+    if (!userInfo) {
+      setError('Unable to verify your account. Please refresh the page.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     
@@ -559,23 +567,23 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
 
     try {
         // --- STAGE 1: Crop and Upload the Selection for Editing ---
-        const cropCanvas = document.createElement('canvas');
-        cropCanvas.width = sWidth;
-        cropCanvas.height = sHeight;
-        const cropCtx2 = cropCanvas.getContext('2d');
+        const cropCanvas2 = document.createElement('canvas');
+        cropCanvas2.width = sWidth;
+        cropCanvas2.height = sHeight;
+        const cropCtx2 = cropCanvas2.getContext('2d');
         if (!cropCtx2) throw new Error("Could not create canvas context for cropping.");
         
         // Draw the cropped region
         cropCtx2.drawImage(loadedImage, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
         
         // Convert cropped region to File and upload to GCS temporarily
-        const croppedBlob = await (await fetch(cropCanvas.toDataURL(currentImageFile.type))).blob();
+        const croppedBlob = await (await fetch(cropCanvas2.toDataURL(currentImageFile.type))).blob();
         const croppedFile = new File([croppedBlob], 'cropped-for-edit.png', { type: currentImageFile.type });
         const croppedUploadResult = await uploadImageToGCS(croppedFile);
         const croppedImageId = croppedUploadResult.imageId;
         
-        // --- STAGE 2: Edit the Cropped Region with Gemini ---
-        const editResult = await editImageFromGCS(croppedImageId, userPrompt, false);
+        // --- STAGE 2: Edit the Cropped Region with Gemini (validation happens here) ---
+        const editResult = await editImageFromGCS(croppedImageId, userPrompt, false, undefined, userInfo);
         
         // --- STAGE 3: Overlay the Edited Result on Original Image ---
         const editedResponse = await fetch(editResult.imageUrl);
@@ -661,6 +669,9 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
         
         setHistory(newHistory);
         setHistoryIndex(newHistory.length - 1);
+        
+        // Refresh credits after editing
+        await onCreditUpdate?.();
 
     } catch(err) {
         setError(err instanceof Error ? err.message : "An unknown error occurred during editing.");
@@ -701,10 +712,16 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
 
   const handleStartScreenGenerate = async () => {
     if (!startScreenPrompt.trim()) return;
+    
+    if (!userInfo) {
+      setError('Unable to verify your account. Please refresh the page.');
+      return;
+    }
+    
     setIsGeneratingOnStart(true);
     setError(null);
     try {
-      const result = await generateImage(startScreenPrompt);
+      const result = await generateImage(startScreenPrompt, userInfo);
       
       // Handle new return format { imageUrl, imageId }
       // Store the imageId for future editing operations
@@ -723,6 +740,9 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
         const newFile = new File([blob], "generated-image.png", { type: 'image/png' });
         handleImageUpload(newFile);
       }
+      
+      // Refresh credits after generation
+      await onCreditUpdate?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'An unknown error occurred.');
     } finally {
