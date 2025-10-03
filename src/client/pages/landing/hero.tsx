@@ -12,9 +12,14 @@ const Hero = () => {
     <div className="min-h-[calc(100vh-4rem)] w-full flex items-center justify-center overflow-hidden border-b border-accent">
       <div className="max-w-screen-xl w-full flex flex-col lg:flex-row mx-auto items-center justify-between gap-y-14 gap-x-10 px-6 py-12 lg:py-0">
         <div className="max-w-xl">
-          <Badge className="rounded-full py-1 border-none">
-            Just released v1.0.0
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className="rounded-full py-1 border-none">
+              Just released v1.0.0
+            </Badge>
+            <Badge variant="outline" className="rounded-full py-1 px-2 text-xs font-semibold bg-orange-500/10 text-orange-600 border-orange-500/20">
+              BETA
+            </Badge>
+          </div>
           
           <h1 className="mt-6 max-w-[20ch] text-3xl xs:text-4xl sm:text-5xl lg:text-[2.75rem] xl:text-5xl font-bold !leading-[1.2] tracking-tight">
             AI-Powered Image Generation & Editing Made Simple
