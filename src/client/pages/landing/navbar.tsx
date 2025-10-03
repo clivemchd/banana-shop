@@ -181,7 +181,7 @@ const MobileCreditsDisplay = ({ showOnPaths = [] }: { showOnPaths?: string[] }) 
     <div className="p-3 bg-accent/50 rounded-lg border">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-yellow-500" />
+          <Zap className="h-4 w-4" />
           <span className="text-sm font-medium">Credits Available</span>
         </div>
         <span className="text-lg font-semibold">
