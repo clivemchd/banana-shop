@@ -160,6 +160,12 @@ https://micro-banana-client-production.up.railway.app/auth/google/callback
 
 ### 4.2 Update Stripe Webhook Endpoint
 
+### 4.2 Update Stripe Webhook Endpoint
+
+**📖 For detailed step-by-step UI guide, see:** [`STRIPE_WEBHOOK_PRODUCTION_SETUP.md`](./STRIPE_WEBHOOK_PRODUCTION_SETUP.md)
+
+**Quick Reference:**
+
 **Option A: Update Existing Webhook**
 
 1. Go to [Stripe Dashboard](https://dashboard.stripe.com/webhooks)
@@ -182,6 +188,7 @@ https://micro-banana-client-production.up.railway.app/auth/google/callback
 3. Endpoint URL: `https://api.nanostudioai.com/payments-webhook`
 4. Select events to listen to:
    - `checkout.session.completed`
+   - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
    - `invoice.payment_succeeded`
@@ -192,6 +199,8 @@ https://micro-banana-client-production.up.railway.app/auth/google/callback
    - Go to `micro-banana-server` → **Variables**
    - Update: `STRIPE_WEBHOOK_SECRET_PROD=whsec_NEW_SECRET`
    - Click **"Deploy"**
+
+**💡 See the complete guide for UI screenshots, event selection details, testing, and troubleshooting.**
 
 ### 4.3 Update Google Cloud Storage CORS (if applicable)
 

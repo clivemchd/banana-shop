@@ -54,12 +54,25 @@ Your pricing system is now fully functional with:
 
 ### 2. 🌐 Webhook Setup
 
-#### For Development (Testing)
+**📚 For comprehensive webhook setup with the new Stripe UI (Workbench), see:**
+- **Production Setup Guide (NEW):** [`STRIPE_WEBHOOK_PRODUCTION_SETUP.md`](./STRIPE_WEBHOOK_PRODUCTION_SETUP.md) - **START HERE!**
+
+This comprehensive guide includes:
+- ✅ Step-by-step setup with screenshots references
+- ✅ Detailed explanation of all 8 events your app handles
+- ✅ Complete troubleshooting section
+- ✅ Testing procedures
+- ✅ Best practices and security
+- ✅ Updated for new Stripe Workbench UI
+
+#### Quick Setup for Development (Local Testing)
+
 1. **Install Stripe CLI**: https://docs.stripe.com/stripe-cli#install
 2. **Login to Stripe**: `stripe login`
 3. **Start webhook forwarding**:
    ```bash
-   stripe listen --forward-to localhost:3001/payments-webhook
+   npm run dev:stripe
+   # Or manually: stripe listen --forward-to localhost:3001/payments-webhook
    ```
 4. **Copy the webhook secret** from CLI output (starts with `whsec_...`)
 5. **Update your `.env.server`**:
@@ -67,21 +80,33 @@ Your pricing system is now fully functional with:
    STRIPE_WEBHOOK_SECRET_TEST=whsec_your_webhook_secret_from_cli
    ```
 
-#### For Production
-1. **Go to Webhooks**: https://dashboard.stripe.com/webhooks
-2. **Add Endpoint**:
-   - Endpoint URL: `https://yourdomain.com/payments-webhook`
-   - Events to send:
-     - `customer.subscription.created`
-     - `customer.subscription.updated`
-     - `customer.subscription.deleted`
-     - `invoice.payment_succeeded`
-     - `invoice.payment_failed`
-3. **Copy the Signing Secret** from webhook details
-4. **Update production environment variables**:
+#### Quick Setup for Production
+
+1. **Go to Webhooks**: https://dashboard.stripe.com/webhooks (Live Mode)
+2. **Click "Add an endpoint"** or **"Create an event destination"**
+3. **Select**: "Your account" → Latest API version
+4. **Select events** → Choose these 8 events:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_succeeded`
+   - `invoice.payment_failed`
+   - `subscription_schedule.created`
+   - `subscription_schedule.released`
+5. **Endpoint URL**: `https://api.nanostudioai.com/payments-webhook`
+6. **Copy the Signing Secret** (click "Reveal")
+7. **Update Railway Variables**:
    ```bash
    STRIPE_WEBHOOK_SECRET_PROD=whsec_your_production_webhook_secret
    ```
+8. **Deploy**: `npm run deploy:railway:update`
+
+**⚠️ Important:** See [`STRIPE_WEBHOOK_PRODUCTION_SETUP.md`](./STRIPE_WEBHOOK_PRODUCTION_SETUP.md) for:
+- Detailed event explanations (what each event does in your app)
+- Complete testing procedures
+- Troubleshooting common webhook issues
+- Monitoring and best practices
 
 ### 3. 📝 Environment Variables Setup
 

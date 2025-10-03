@@ -235,16 +235,22 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
     if (file) {
       onImageStateChange?.(true);
       resetSelection();
-      const newImageUrl = URL.createObjectURL(file);
-      setImageUrl(newImageUrl);
       
-      const img = new Image();
-      img.onload = () => {
-        setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-        setLoadedImage(img);
-        // Pan and scale are managed separately to persist user settings
+      // Convert File to data URL instead of blob URL to avoid CSP issues
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setImageUrl(dataUrl);
+        
+        const img = new Image();
+        img.onload = () => {
+          setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+          setLoadedImage(img);
+          // Pan and scale are managed separately to persist user settings
+        };
+        img.src = dataUrl;
       };
-      img.src = newImageUrl;
+      reader.readAsDataURL(file);
     } else {
       onImageStateChange?.(false);
       // Clear image when history is empty
@@ -593,7 +599,12 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
             editedImg.onload = () => resolve();
             editedImg.onerror = reject;
         });
-        editedImg.src = URL.createObjectURL(editedBlob);
+        // Convert blob to data URL to avoid CSP issues
+        const reader = new FileReader();
+        reader.onload = () => {
+            editedImg.src = reader.result as string;
+        };
+        reader.readAsDataURL(editedBlob);
         await editedLoadPromise;
         
         // Composite: Draw original + overlay edited region
