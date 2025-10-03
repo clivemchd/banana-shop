@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 // import { login, useAuth } from "wasp/client/auth";
 import { useAuth } from "wasp/client/auth";
 import { Environment } from "../../utils/environment";
+import { initiateGoogleSignIn } from "../../utils/auth-helpers";
 import {
   Tooltip,
   TooltipContent,
@@ -182,11 +183,7 @@ export const SignInPage = () => {
                     variant="outline" 
                     className="w-full mt-4" 
                     type="button"
-                    onClick={() => {
-                      // Use the server port for Google OAuth
-                      const serverPort = '3001';
-                      window.location.href = `http://localhost:${serverPort}/auth/google/login`;
-                    }}
+                    onClick={initiateGoogleSignIn}
                   >
                     <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                       <path

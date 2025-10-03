@@ -2,6 +2,7 @@ import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth } from "wasp/client/auth";
+import { initiateGoogleSignIn } from "../../utils/auth-helpers";
 import Navbar from "../landing/navbar";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui";
 
@@ -17,9 +18,7 @@ export const GoogleSignInPage = () => {
   }, [user, navigate]);
 
   const handleGoogleSignIn = () => {
-    // Use the server port for Google OAuth
-    const serverPort = '3001';
-    window.location.href = `http://localhost:${serverPort}/auth/google/login`;
+    initiateGoogleSignIn();
   };
 
   return (
