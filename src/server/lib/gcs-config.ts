@@ -14,7 +14,7 @@ function getStorageConfig(): StorageOptions {
   }
 
   // Production: Use credentials from environment variable
-  if (true) {
+  if (isProduction) {
     const credentialsBase64 = process.env.GOOGLE_CREDENTIALS_BASE64;
     
     if (!credentialsBase64) {
