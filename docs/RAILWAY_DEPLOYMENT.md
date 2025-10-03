@@ -154,35 +154,26 @@ gsutil cors set cors.json gs://your-bucket-name
 
 ## Custom Domain Setup
 
-### 1. Add Domain to Railway Client Service
+**For detailed custom domain setup instructions, see [CUSTOM_DOMAIN_SETUP.md](./CUSTOM_DOMAIN_SETUP.md)**
 
-1. Go to [Railway Dashboard](https://railway.com/dashboard)
-2. Select `micro-banana` project
-3. Click on `micro-banana-client` service
-4. Go to Settings > Custom Domain
-5. Enter your domain (e.g., `nanostudio.com`)
-6. Enter port: `8080`
-7. Click "Add Domain"
+### Quick Reference
 
-### 2. Update DNS Records
+If you have a custom domain (e.g., `nanostudioai.com`), you can configure it:
 
-Add a CNAME record with your domain provider:
-- Type: `CNAME`
-- Name: `@` (or your subdomain)
-- Value: The Railway URL provided in the dashboard
+**Current Production URLs:**
+- Client: `https://nanostudioai.com` and `https://www.nanostudioai.com`
+- Server: `https://api.nanostudioai.com`
 
-### 3. Update Environment Variables
+**Railway Default URLs (backup):**
+- Client: `https://micro-banana-client-production.up.railway.app`
+- Server: `https://micro-banana-server-production.up.railway.app`
 
-1. Go to `micro-banana-server` service
-2. Variables tab
-3. Update `WASP_WEB_CLIENT_URL` to your custom domain:
-   ```
-   https://nanostudio.com
-   ```
-
-### 4. Update OAuth & Stripe
-
-Repeat the post-deployment steps with your custom domain URLs.
+See the full custom domain setup guide for:
+- Cloudflare DNS configuration
+- Railway domain setup
+- SSL certificate provisioning
+- External service updates (Google OAuth, Stripe)
+- Troubleshooting and verification
 
 ## Production Considerations
 

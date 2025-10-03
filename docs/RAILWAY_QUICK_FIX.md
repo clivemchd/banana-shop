@@ -48,7 +48,7 @@ When you're ready for production:
    - Publishable key (starts with `pk_live_...`)
 5. Go to **Developers** > **Webhooks**
 6. Create a new webhook endpoint:
-   - URL: `https://micro-banana-server.railway.app/payments-webhook`
+   - URL: `https://api.nanostudioai.com/payments-webhook` (or Railway URL if not using custom domain)
    - Events: Select all subscription and payment events
 7. Copy the webhook signing secret (starts with `whsec_...`)
 

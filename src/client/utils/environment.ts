@@ -22,7 +22,7 @@ export const config = {
   // This is primarily for reference. Wasp handles API calls internally.
   apiUrl: Environment.isDevelopment 
     ? 'http://localhost:3001'
-    : (Environment.getClientVar('API_URL') || 'https://micro-banana-server-production.up.railway.app'),
+    : (Environment.getClientVar('API_URL') || 'https://api.nanostudioai.com'),
     
   enableDebugLogs: Environment.isDevelopment,
   
