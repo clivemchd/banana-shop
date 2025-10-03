@@ -137,10 +137,9 @@ Regional editing involves **two separate Gemini API calls**:
    - Downloads marked image from GCS
    - **Deletes old marked file** (cleanup)
    - If `shouldBlend === true`: Constructs generic blending prompt server-side
-     * Blend prompt: "Blend and smooth all visible border lines in this image. Remove any artificial borders or outlines while keeping the image content intact."
-     * System instruction: "You are an image processing expert. Smooth out any visible borders or seams in the image to create natural transitions. Do not alter the main content."
-     * Very low temperature (0.2) for highly predictable, conservative results
-     * **Generic approach**: Doesn't mention specific colors to avoid triggering safety filters
+     * Blend prompt: "Smooth and blend the ${borderColor} border line into the surrounding image. Remove the ${borderColor} line completely while preserving all image content."
+     * System instruction: "Ensure to change the cropped image as it is in structure and return the same exact image with the specified modifications."
+     * Keep temperature (0.4) always
    - If `shouldBlend === false`: Uses user-provided prompt with creative system instruction
    - Calls Gemini API with appropriate configuration
    - Gemini removes border and blends edges
