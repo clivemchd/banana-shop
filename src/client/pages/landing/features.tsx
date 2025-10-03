@@ -13,7 +13,7 @@ const features = [
     description:
       "Effortlessly generate high-quality, professional-grade images. Powered by Nano Banana.",
     videoSettings: {
-      src: "/assets/videos/short-cap-full-tut-music.mp4",
+      src: "/assets/videos/feature-create-snippet.mp4",
       startTime: 0,
       endTime: 3,
       loop: true,
@@ -36,9 +36,9 @@ const features = [
     description:
       "Edit images seamlessly with advanced precision tools. Perfect for inpainting and detailed adjustments.",
     videoSettings: {
-      src: "/assets/videos/short-cap-full-tut-music.mp4",
-      startTime: 5.5,
-      endTime: 15,
+      src: "/assets/videos/feature-edit-snippet.mp4",
+      startTime: 0,
+      endTime: 9.5,
       loop: true,
       autoPlay: true,
       muted: true,
@@ -59,7 +59,7 @@ const features = [
     description:
       "Easily track, undo, and redo changes. Stay in control of your creative process at all times.",
     videoSettings: {
-      src: "/assets/videos/cap-undo-redo-fast.mp4",
+      src: "/assets/videos/feature-history-snippet.mp4",
       startTime: 0,
       endTime: 6,
       loop: true,

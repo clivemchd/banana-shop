@@ -74,9 +74,9 @@ const Hero = () => {
         <div className="relative lg:max-w-lg xl:max-w-xl w-full bg-accent rounded-xl aspect-square overflow-hidden">
           <VideoPlayer 
             settings={{
-              src: "/assets/videos/short-cap-full-tut-music.mp4",
-              startTime: 13,
-              endTime: 17,
+              src: "/assets/videos/hero-snippet.mp4",
+              startTime: 0,
+              endTime: 4,
               loop: true,
               autoPlay: true,
               muted: true,
