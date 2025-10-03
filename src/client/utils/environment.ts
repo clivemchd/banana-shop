@@ -18,9 +18,11 @@ export const Environment = {
 
 // Example usage:
 export const config = {
+  // Note: In Wasp, the API URL is automatically configured via WASP_SERVER_URL
+  // This is primarily for reference. Wasp handles API calls internally.
   apiUrl: Environment.isDevelopment 
     ? 'http://localhost:3001'
-    : 'https://your-production-api.com',
+    : (Environment.getClientVar('API_URL') || 'https://micro-banana-server-production.up.railway.app'),
     
   enableDebugLogs: Environment.isDevelopment,
   

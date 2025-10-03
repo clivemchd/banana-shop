@@ -29,6 +29,8 @@
     "dev": "bash ./bash/dev.sh",
     "build": "bash ./bash/prod.sh",
     "deploy": "bash ./bash/deploy.sh",
+    "deploy:railway": "bash ./bash/deploy-railway.sh",
+    "deploy:railway:update": "wasp deploy railway deploy micro-banana",
     "db:start": "bash ./bash/db-start.sh",
     "db:stop": "bash ./bash/db-stop.sh",
     "dev:dbm": "bash ./bash/db-migrate-dev.sh",
