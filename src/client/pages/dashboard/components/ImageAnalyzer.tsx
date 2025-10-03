@@ -616,10 +616,10 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
         const dominantColors = getDominantColors(compositionCtx, selection, imgWidth, imgHeight);
         const { colorHex, colorName } = getBestContrastColor(dominantColors);
         
-        const lineWidth = Math.max(6, Math.round(imgWidth / 100));
+        const lineWidth = Math.max(15, Math.round(imgWidth / 100));
 
         // Draw the contrast border to mark the region for blending
-        compositionCtx.strokeStyle = colorHex;
+        compositionCtx.strokeStyle = colorHex + '80';
         compositionCtx.lineWidth = lineWidth;
         compositionCtx.strokeRect(sx, sy, sWidth, sHeight);
         
