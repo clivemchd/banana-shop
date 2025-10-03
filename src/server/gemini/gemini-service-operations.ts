@@ -1,8 +1,7 @@
-// @ts-nocheck - Temporary to avoid GCS library type issues
 import { GoogleGenAI, Modality } from "@google/genai";
-import { Storage } from '@google-cloud/storage';
 import { HttpError } from 'wasp/server';
 import { validateAndDeductCredits } from '../credits/credit-guard';
+import { createStorageClient } from '../lib/gcs-config';
 
 export interface GenerateImageArgs {
   prompt: string;
@@ -84,10 +83,7 @@ export const generateImage = async (args: GenerateImageArgs, context: any): Prom
 
         if (imagePartData) {
             // Upload generated image to GCS ROOT (no folders)
-            const storage = new Storage({
-                projectId: process.env.GCP_PROJECT_ID,
-                keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-            });
+            const storage = createStorageClient();
             
             const bucketName = process.env.GCP_BUCKET_NAME;
             if (!bucketName) {
@@ -205,10 +201,7 @@ export const editImageFromGCS = async (
     }
 
     // Download image from GCS
-    const storage = new Storage({
-        projectId: process.env.GCP_PROJECT_ID,
-        keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    });
+    const storage = createStorageClient();
     
     const bucketName = process.env.GCP_BUCKET_NAME;
     if (!bucketName) {
@@ -288,7 +281,6 @@ export const editImageFromGCS = async (
           break;
         case 'MAX_TOKENS':
         case 'OTHER':
-        case 'IMAGE_OTHER':
           errorMessage += shouldBlend
             ? 'Unable to blend the image edges. This sometimes happens with complex images. Try selecting a smaller region or simplifying the edit.'
             : 'Unable to complete the edit. Please try a simpler edit prompt or a smaller selection area.';

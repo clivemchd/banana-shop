@@ -1,12 +1,7 @@
-import { Storage } from '@google-cloud/storage';
+import { getStorageBucket } from '../lib/gcs-config';
 
-// Initialize Google Cloud Storage
-const storage = new Storage({
-  projectId: process.env.GCP_PROJECT_ID,
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-});
-
-const bucket = storage.bucket(process.env.GCP_BUCKET_NAME!);
+// Initialize Google Cloud Storage bucket
+const bucket = getStorageBucket();
 
 export interface GeneratePresignedUploadUrlArgs {
   fileName: string;

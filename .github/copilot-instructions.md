@@ -18,6 +18,7 @@ Rules of the project:
 14. Do not provide fallbacks for user provided errors always fix that specific error
 15. As a good practice avoid using useEffect
 16. In the server do not use console.error or console anything console should work only if it is in devlopment
+17. Do not use "any" or "unknown" types
 
 
 

@@ -1,5 +1,4 @@
-// Image query operations for retrieving user images and edit history
-// @ts-nocheck
+import type { Image } from 'wasp/entities';
 
 export interface GetUserImagesArgs {
   limit?: number;
@@ -63,17 +62,16 @@ export const getUserImages = async (
     });
 
     return {
-      images: images.map(image => ({
+      images: images.map((image: Image) => ({
         id: image.id,
         url: image.url,
-        originalUrl: image.originalUrl,
         description: image.description,
         fileName: image.fileName,
         mimeType: image.mimeType,
         isPublic: image.isPublic,
         createdAt: image.createdAt,
         updatedAt: image.updatedAt,
-        latestEdit: image.editHistory[0] || null,
+        latestEdit: (image as any).editHistory?.[0] || null,
       })),
       totalCount,
       hasMore: offset + images.length < totalCount,
@@ -117,14 +115,13 @@ export const getImageWithHistory = async (
     return {
       id: image.id,
       url: image.url,
-      originalUrl: image.originalUrl,
       description: image.description,
       fileName: image.fileName,
       mimeType: image.mimeType,
       isPublic: image.isPublic,
       createdAt: image.createdAt,
       updatedAt: image.updatedAt,
-      editHistory: image.editHistory.map((edit: any) => ({
+      editHistory: ((image as any).editHistory || []).map((edit: any) => ({
         id: edit.id,
         editType: edit.editType,
         prompt: edit.prompt,
@@ -165,7 +162,6 @@ export const getImageById = async (
     return {
       id: image.id,
       url: image.url,
-      originalUrl: image.originalUrl,
       description: image.description,
       fileName: image.fileName,
       mimeType: image.mimeType,
@@ -248,17 +244,16 @@ export const searchUserImages = async (
     });
 
     return {
-      images: images.map(image => ({
+      images: images.map((image: Image) => ({
         id: image.id,
         url: image.url,
-        originalUrl: image.originalUrl,
         description: image.description,
         fileName: image.fileName,
         mimeType: image.mimeType,
         isPublic: image.isPublic,
         createdAt: image.createdAt,
         updatedAt: image.updatedAt,
-        latestEdit: image.editHistory[0] || null,
+        latestEdit: (image as any).editHistory?.[0] || null,
       })),
       totalCount,
       hasMore: offset + images.length < totalCount,
