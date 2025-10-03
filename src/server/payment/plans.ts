@@ -76,8 +76,7 @@ export const paymentPlans: Record<PaymentPlanId, PaymentPlan> = {
     features: [
       '80 image generations',
       '40 image edits per month',
-      'Standard processing speed',
-      'Community support'
+      'Standard processing speed'
     ],
   },
   [PaymentPlanId.Pro]: {
@@ -94,8 +93,7 @@ export const paymentPlans: Record<PaymentPlanId, PaymentPlan> = {
     features: [
       '360 image generations per month',
       '180 image edits per month',
-      'Faster processing',
-      'Email support'
+      'Faster processing'
     ],
     isPopular: true,
   },

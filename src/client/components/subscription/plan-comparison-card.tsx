@@ -265,7 +265,7 @@ const PlanComparisonCard: React.FC<PlanComparisonCardProps> = ({
                             </TableRow>
 
                             {/* Support Features */}
-                            <TableRow className="bg-muted/50">
+                            {/* <TableRow className="bg-muted/50">
                                 <TableCell className="font-medium">Email Support</TableCell>
                                 <TableCell className="text-center">
                                     <Check className="h-4 w-4 text-green-600 mx-auto" />
@@ -276,7 +276,7 @@ const PlanComparisonCard: React.FC<PlanComparisonCardProps> = ({
                                 <TableCell className="text-center">
                                     <Check className="h-4 w-4 text-green-600 mx-auto" />
                                 </TableCell>
-                            </TableRow>
+                            </TableRow> */}
                             <TableRow className="bg-muted/50">
                                 <TableCell className="font-medium">Dedicated Support</TableCell>
                                 <TableCell className="text-center">
