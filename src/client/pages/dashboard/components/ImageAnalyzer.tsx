@@ -583,7 +583,13 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
         cropCtx2.drawImage(loadedImage, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
         
         // Convert cropped region to File and upload to GCS temporarily
-        const croppedBlob = await (await fetch(cropCanvas2.toDataURL(currentImageFile.type))).blob();
+        // Use toBlob() instead of fetch(toDataURL()) to avoid CSP issues
+        const croppedBlob = await new Promise<Blob>((resolve, reject) => {
+          cropCanvas2.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Failed to create blob from canvas'));
+          }, currentImageFile.type);
+        });
         const croppedFile = new File([croppedBlob], 'cropped-for-edit.png', { type: currentImageFile.type });
         const croppedUploadResult = await uploadImageToGCS(croppedFile);
         const croppedImageId = croppedUploadResult.imageId;
@@ -649,7 +655,13 @@ export const ImageAnalyzer = forwardRef<ImageAnalyzerHandles, ImageAnalyzerProps
         }
 
         // --- STAGE 5: Upload Marked Image for Blending ---
-        const markedBlob = await (await fetch(compositionCanvas.toDataURL(currentImageFile.type))).blob();
+        // Use toBlob() instead of fetch(toDataURL()) to avoid CSP issues
+        const markedBlob = await new Promise<Blob>((resolve, reject) => {
+          compositionCanvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Failed to create blob from canvas'));
+          }, currentImageFile.type);
+        });
         const markedFile = new File([markedBlob], 'marked-for-blend.png', { type: currentImageFile.type });
         
         // Upload to GCS temporarily (this will update currentImageId if exists)
