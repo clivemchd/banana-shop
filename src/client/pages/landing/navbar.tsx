@@ -102,7 +102,7 @@ const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string
             
             {/* Menu Items */}
             <div className="py-1">
-              <button
+              {/* <button
                 onClick={() => {
                   setIsOpen(false);
                   // TODO: Navigate to account page
@@ -111,7 +111,7 @@ const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string
               >
                 <SquareUser className="h-4 w-4" />
                 Account Settings
-              </button>
+              </button> */}
               
               <button
                 onClick={() => {
@@ -157,7 +157,7 @@ const CreditsDisplay = ({ showOnPaths = [] }: { showOnPaths?: string[] }) => {
 
   return (
     <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-accent/50 rounded-full border">
-      <Zap className="h-4 w-4 text-yellow-500" />
+      <Zap className="h-4 w-4" />
       <span className="text-sm font-medium">
         {subscription.credits || 0}
       </span>
@@ -181,7 +181,7 @@ const MobileCreditsDisplay = ({ showOnPaths = [] }: { showOnPaths?: string[] }) 
     <div className="p-3 bg-accent/50 rounded-lg border">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-yellow-500" />
+          <Zap className="h-4 w-4" />
           <span className="text-sm font-medium">Credits Available</span>
         </div>
         <span className="text-lg font-semibold">
@@ -278,7 +278,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
               
               {/* Menu Items */}
               <div className="space-y-2">
-                <Button
+                {/* <Button
                   variant="ghost"
                   className="w-full justify-start gap-2"
                   onClick={() => {
@@ -288,7 +288,7 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
                 >
                   <SquareUser className="h-4 w-4" />
                   Account Settings
-                </Button>
+                </Button> */}
                 
                 <Button
                   variant="ghost"

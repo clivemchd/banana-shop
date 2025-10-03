@@ -12,4 +12,12 @@ Rules of the project:
 9. Do not use require to load modules
 10. never use as any type assertion
 11. Do not add tyoe assertions
+12. Dont use wasp start the alternative for it is npm run dev
+13. Dont wasp build on dev the alternative for it is npm run dev
+14. When in agent mode provide a detailed plan on what you intend to do and suggest better alternatives and recommendations if available for me to approve before you start adding code.
+14. Do not provide fallbacks for user provided errors always fix that specific error
+15. As a good practice avoid using useEffect
+16. In the server do not use console.error or console anything console should work only if it is in devlopment
+
+
 

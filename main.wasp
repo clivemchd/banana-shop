@@ -41,20 +41,28 @@ app NanoStudio {
 	}
 }
 
+// Google-only Sign In Page (active)
+route GoogleSignInPageRoute { path: "/signin", to: GoogleSignInPage }
+page GoogleSignInPage {
+  component: import { GoogleSignInPage } from "@src/client/pages/auth/google-sign-in"
+}
+
+// Traditional Auth Pages (disabled - uncomment to re-enable)
 route SignUpPageRoute { path: "/signup", to: SignUpPage }
 page SignUpPage {
-  component: import { SignUpPage } from "@src/client/pages/auth/sign-up"
+  component: import { GoogleSignInPage } from "@src/client/pages/auth/google-sign-in"
+//   component: import { SignUpPage } from "@src/client/pages/auth/sign-up"
 }
 
-route SignInPageRoute { path: "/signin", to: SignInPage }
-page SignInPage {
-  component: import { SignInPage } from "@src/client/pages/auth/sign-in"
-}
+// route SignInPageRoute { path: "/signin", to: SignInPage }
+// page SignInPage {
+//   component: import { SignInPage } from "@src/client/pages/auth/sign-in"
+// }
 
-route ForgotPasswordRoute { path: "/forgot-password", to: ForgotPasswordPage }
-page ForgotPasswordPage {
-  component: import { ForgotPasswordPage } from "@src/client/pages/auth/forgot-password"
-}
+// route ForgotPasswordRoute { path: "/forgot-password", to: ForgotPasswordPage }
+// page ForgotPasswordPage {
+//   component: import { ForgotPasswordPage } from "@src/client/pages/auth/forgot-password"
+// }
 
 route PasswordResetRoute { path: "/password-reset", to: PasswordResetPage }
 page PasswordResetPage {
@@ -96,6 +104,37 @@ query generateTextToImage {
 query generateImageToImage {
 	fn: import { generateImageToImage } from "@src/server/image/image-operations",
 	entities: [Users]
+}
+
+action generateImageWithGemini {
+	fn: import { generateImage } from "@src/server/gemini/gemini-service-operations",
+	entities: [Users, Image]
+}
+
+action generatePresignedUploadUrl {
+	fn: import { generatePresignedUploadUrl } from "@src/server/image/upload-operations",
+	entities: [Users, Image]
+}
+
+action confirmImageUpload {
+	fn: import { confirmImageUpload } from "@src/server/image/upload-operations",
+	entities: [Users, Image]
+}
+
+action editImageFromGCS {
+	fn: import { editImageFromGCS } from "@src/server/gemini/gemini-service-operations",
+	entities: [Users, Image]
+}
+
+// Image management
+query getUserImages {
+	fn: import { getUserImages } from "@src/server/image/image-queries",
+	entities: [Users, Image]
+}
+
+query getImageById {
+	fn: import { getImageById } from "@src/server/image/image-queries",
+	entities: [Users, Image]
 }
 
 // Payment operations
