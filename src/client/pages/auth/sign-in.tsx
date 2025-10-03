@@ -1,7 +1,8 @@
 import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { login, useAuth } from "wasp/client/auth";
+// import { login, useAuth } from "wasp/client/auth";
+import { useAuth } from "wasp/client/auth";
 import { Environment } from "../../utils/environment";
 import {
   Tooltip,
@@ -52,8 +53,9 @@ export const SignInPage = () => {
     }
 
     try {
-      await login({ email, password });
-      navigate("/");
+      // await login({ email, password });
+      // navigate("/");
+      setError("Email/password login is currently disabled. Please use Google sign-in.");
     } catch (error: any) {
       // Secure error handling - don't expose sensitive information
       if (error.message?.includes("email not verified") || error.message?.includes("not verified")) {

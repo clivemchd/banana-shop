@@ -1,5 +1,5 @@
 import "../../../index.css";
-import { VerifyEmailForm } from "wasp/client/auth";
+// import { VerifyEmailForm } from "wasp/client/auth";
 import Navbar from "../landing/navbar";
 
 export const EmailVerificationPage = () => {
@@ -7,7 +7,10 @@ export const EmailVerificationPage = () => {
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <div className="flex-1 flex items-center justify-center p-4">
-        <VerifyEmailForm />
+        {/* <VerifyEmailForm /> */}
+        <div className="text-center">
+          <p>Email verification is currently disabled.</p>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { requestPasswordReset, useAuth } from "wasp/client/auth";
+// import { requestPasswordReset, useAuth } from "wasp/client/auth";
+import { useAuth } from "wasp/client/auth";
 import { Environment } from "../../utils/environment";
 import {
   Card,
@@ -44,8 +45,9 @@ export const ForgotPasswordPage = () => {
     }
 
     try {
-      await requestPasswordReset({ email });
-      setNeedsConfirmation(true);
+      // await requestPasswordReset({ email });
+      // setNeedsConfirmation(true);
+      setError("Password reset is currently disabled. Please use Google sign-in.");
       setEmail("");
       
       if (Environment.isDevelopment) {

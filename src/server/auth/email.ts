@@ -1,8 +1,9 @@
-import { type GetVerificationEmailContentFn, type GetPasswordResetEmailContentFn } from 'wasp/server/auth';
+// import { type GetVerificationEmailContentFn, type GetPasswordResetEmailContentFn } from 'wasp/server/auth';
 
 console.log('📧 EMAIL MODULE LOADED - This should appear when server starts');
 
-export const getVerificationEmailContent: GetVerificationEmailContentFn = ({ verificationLink }) => {
+// export const getVerificationEmailContent: GetVerificationEmailContentFn = ({ verificationLink }) => {
+export const getVerificationEmailContent = ({ verificationLink }: { verificationLink: string }) => {
   console.log('🔧 DEBUG: getVerificationEmailContent called with link:', verificationLink);
   
   const emailContent = {
@@ -86,7 +87,8 @@ The Nano Studio Team
   return emailContent;
 };
 
-export const getPasswordResetEmailContent: GetPasswordResetEmailContentFn = ({ passwordResetLink }) => {
+// export const getPasswordResetEmailContent: GetPasswordResetEmailContentFn = ({ passwordResetLink }) => {
+export const getPasswordResetEmailContent = ({ passwordResetLink }: { passwordResetLink: string }) => {
   console.log('🔧 DEBUG: getPasswordResetEmailContent called with link:', passwordResetLink);
 
   const emailContent = {

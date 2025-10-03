@@ -1,6 +1,7 @@
 import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
-import { signup, useAuth } from "wasp/client/auth";
+// import { signup, useAuth } from "wasp/client/auth";
+import { useAuth } from "wasp/client/auth";
 import { useState, useEffect } from "react";
 import { cn } from "../../../lib/utils";
 import { Environment } from "../../utils/environment";
@@ -87,12 +88,13 @@ export const SignUpPage = () => {
     try {
       // Wasp's email auth requires both email and username fields
       // We use email for both to keep it simple for users
-      await signup({
-        email: email,
-        username: email, // Use email as username (transparent to user)
-        password: password
-      });      // Don't auto-login - require email verification
-      setSignupComplete(true);
+      // await signup({
+      //   email: email,
+      //   username: email, // Use email as username (transparent to user)
+      //   password: password
+      // });      // Don't auto-login - require email verification
+      // setSignupComplete(true);
+      setError("Email/password signup is currently disabled. Please use Google sign-in.");
 
       if (Environment.isDevelopment) {
         console.log("🔔 Email verification required for:", email);

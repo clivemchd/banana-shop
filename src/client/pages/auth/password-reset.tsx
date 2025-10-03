@@ -1,7 +1,8 @@
 import "../../../index.css";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { resetPassword, useAuth } from "wasp/client/auth";
+// import { resetPassword, useAuth } from "wasp/client/auth";
+import { useAuth } from "wasp/client/auth";
 import { cn } from "../../../lib/utils";
 import {
   Card,
@@ -76,11 +77,12 @@ export const PasswordResetPage = () => {
 
     try {
       // The token is passed as a query parameter
-      const token = new URLSearchParams(window.location.search).get('token');
-      if (!token) throw new Error('Token not found in URL');
+      // const token = new URLSearchParams(window.location.search).get('token');
+      // if (!token) throw new Error('Token not found in URL');
       
-      await resetPassword({ token, password });
-      navigate('/signin');
+      // await resetPassword({ token, password });
+      // navigate('/signin');
+      setError("Password reset is currently disabled. Please use Google sign-in.");
     } catch (error: any) {
       console.error('Error during password reset:', error);
       setError(error);
