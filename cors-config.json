@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["http://localhost:3000", "https://nanostudioai.com", "https://www.nanostudioai.com"],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
+    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
+    "maxAgeSeconds": 3600
+  }
+]

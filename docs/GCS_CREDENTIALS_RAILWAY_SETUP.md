@@ -3,6 +3,34 @@
 ## 🔒 Security Best Practice
 **NEVER** commit your `banana-shop-470810-a4d04f8e0b63.json` credentials file to GitHub. It's already in `.gitignore` - keep it that way!
 
+## 🌐 Step 0: Configure CORS for Your GCS Bucket
+
+Before using GCS in production, you need to enable CORS to allow your frontend to upload/download files:
+
+### Quick Setup (Recommended)
+```bash
+# Run the automated script
+./bash/setup-gcs-cors.sh
+```
+
+### Manual Setup
+If you prefer to do it manually:
+
+```bash
+# For development bucket
+gcloud storage buckets update gs://banana-shop-bucket-dev --cors-file=cors-config.json
+
+# For production bucket
+gcloud storage buckets update gs://banana-shop-bucket-prod --cors-file=cors-config.json
+```
+
+### Verify CORS Configuration
+```bash
+gcloud storage buckets describe gs://banana-shop-bucket-dev --format='default(cors_config)'
+```
+
+You should see output showing your CORS configuration with allowed origins including your domain.
+
 ## 📝 How to Set Up GCS Credentials in Railway
 
 ### Step 1: Get Your Credentials JSON Content
@@ -31,7 +59,7 @@ Make sure these environment variables are also set in Railway:
 # Required for GCS
 GCP_PROJECT_ID=banana-shop-470810
 GCP_BUCKET_NAME=banana-shop-bucket-prod  # Use your production bucket name
-GOOGLE_CREDENTIALS_JSON=<paste-entire-json-here>
+GOOGLE_CREDENTIALS_BASE64=<paste-base64-encoded-credentials-here>
 
 # Other required variables
 NODE_ENV=production
@@ -41,6 +69,32 @@ GOOGLE_CLIENT_SECRET=<your-google-client-secret>
 STRIPE_SECRET_KEY_TEST=<your-stripe-key>
 # ... other environment variables
 ```
+
+## 🚨 Common Issues
+
+### CORS Errors
+If you see errors like:
+```
+Access to fetch at 'https://storage.googleapis.com/...' has been blocked by CORS policy
+```
+
+**Solution**: Run the CORS setup script:
+```bash
+./bash/setup-gcs-cors.sh
+```
+
+Or manually configure CORS (see Step 0 above).
+
+### Production Domain Not Working
+Make sure to add your production domain to `cors-config.json`:
+```json
+{
+  "origin": ["http://localhost:3000", "https://nanostudioai.com", "https://your-production-domain.com"],
+  ...
+}
+```
+
+Then re-run the CORS setup script.
 
 ## 🏠 Local Development
 
