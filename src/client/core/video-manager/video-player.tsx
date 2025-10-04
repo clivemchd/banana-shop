@@ -10,6 +10,7 @@ export interface VideoSettings {
   playsInline?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  posterImage?: string; // Optional custom poster image path
   // New responsive positioning options
   objectFit?: 'cover' | 'contain' | 'fill' | 'scale-down' | 'none';
   responsivePosition?: 
@@ -45,6 +46,11 @@ const VideoPlayer = ({ settings }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentBreakpoint, setCurrentBreakpoint] = useState('md');
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [posterError, setPosterError] = useState(false);
+
+  // Get the poster image path by replacing .mp4 with .png in the video src
+  const posterImagePath = settings.posterImage || settings.src.replace('.mp4', '.png').replace('/videos/', '/images/');
 
   // Breakpoint detection for responsive positioning
   useEffect(() => {
@@ -74,6 +80,11 @@ const VideoPlayer = ({ settings }: VideoPlayerProps) => {
       }
     };
 
+    const handlePlaying = () => {
+      // Video has started playing
+      setIsVideoPlaying(true);
+    };
+
     const handleTimeUpdate = () => {
       if (settings.endTime !== undefined && settings.startTime !== undefined) {
         if (video.currentTime >= settings.endTime) {
@@ -83,6 +94,7 @@ const VideoPlayer = ({ settings }: VideoPlayerProps) => {
     };
 
     video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('playing', handlePlaying);
     
     if (settings.loop && settings.startTime !== undefined && settings.endTime !== undefined) {
       video.addEventListener('timeupdate', handleTimeUpdate);
@@ -90,6 +102,7 @@ const VideoPlayer = ({ settings }: VideoPlayerProps) => {
 
     return () => {
       video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('playing', handlePlaying);
       video.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [settings]);
@@ -189,10 +202,21 @@ const VideoPlayer = ({ settings }: VideoPlayerProps) => {
   // Special handling for problematic videos or responsive positioning
   if (settings.responsivePosition || settings.responsivePositionVW || settings.transformPosition) {
     return (
-      <div ref={containerRef} className="w-full h-full overflow-hidden">
+      <div ref={containerRef} className="w-full h-full overflow-hidden relative">
+        {/* Poster image shown while video is loading */}
+        {!isVideoPlaying && !posterError && (
+          <img
+            src={posterImagePath}
+            alt="Video thumbnail"
+            className={settings.className || "object-cover w-full h-full"}
+            style={getResponsiveStyle()}
+            onError={() => setPosterError(true)}
+          />
+        )}
+        {/* Video element - hidden until it starts playing */}
         <video
           ref={videoRef}
-          className={settings.className || "object-cover w-full h-full"}
+          className={`${settings.className || "object-cover w-full h-full"} ${!isVideoPlaying ? 'opacity-0 absolute inset-0' : ''}`}
           style={getResponsiveStyle()}
           autoPlay={settings.autoPlay}
           muted={settings.muted}
@@ -207,18 +231,31 @@ const VideoPlayer = ({ settings }: VideoPlayerProps) => {
   }
 
   return (
-    <video
-      ref={videoRef}
-      className={settings.className || "object-cover w-full h-full"}
-      style={settings.style}
-      autoPlay={settings.autoPlay}
-      muted={settings.muted}
-      loop={settings.loop}
-      playsInline={settings.playsInline}
-    >
-      <source src={settings.src} type="video/mp4" />
-      Your browser does not support the video tag.
-    </video>
+    <div className="w-full h-full overflow-hidden relative">
+      {/* Poster image shown while video is loading */}
+      {!isVideoPlaying && !posterError && (
+        <img
+          src={posterImagePath}
+          alt="Video thumbnail"
+          className={settings.className || "object-cover w-full h-full"}
+          style={settings.style}
+          onError={() => setPosterError(true)}
+        />
+      )}
+      {/* Video element - hidden until it starts playing */}
+      <video
+        ref={videoRef}
+        className={`${settings.className || "object-cover w-full h-full"} ${!isVideoPlaying ? 'opacity-0 absolute inset-0' : ''}`}
+        style={settings.style}
+        autoPlay={settings.autoPlay}
+        muted={settings.muted}
+        loop={settings.loop}
+        playsInline={settings.playsInline}
+      >
+        <source src={settings.src} type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+    </div>
   );
 };
 

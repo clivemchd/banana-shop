@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { CreditCard, ExternalLink } from 'lucide-react';
+import { CreditCard, ExternalLink, Loader2 } from 'lucide-react';
 
 interface BillingManagementCardProps {
     subscription: any;
@@ -39,8 +39,17 @@ const BillingManagementCard: React.FC<BillingManagementCardProps> = ({
                     className="w-full"
                     variant="outline"
                 >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    {portalLoading ? 'Loading...' : subscription?.subscriptionStatus === 'canceled' ? 'Billing Unavailable' : 'Open Billing Portal'}
+                    {portalLoading ? (
+                        <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Opening Portal...
+                        </>
+                    ) : (
+                        <>
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            {subscription?.subscriptionStatus === 'canceled' ? 'Billing Unavailable' : 'Open Billing Portal'}
+                        </>
+                    )}
                 </Button>
 
                 {portalError && subscription?.subscriptionStatus !== 'canceled' && (

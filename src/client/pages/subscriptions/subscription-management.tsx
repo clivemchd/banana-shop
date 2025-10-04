@@ -44,6 +44,7 @@ const SubscriptionManagementPage = () => {
     const [pendingPlanId, setPendingPlanId] = useState<PaymentPlanId | null>(null);
     const [searchParams, setSearchParams] = useSearchParams();
     const [showScheduledMessage, setShowScheduledMessage] = useState<boolean>(false);
+    const [billingPortalLoading, setBillingPortalLoading] = useState<boolean>(false);
 
     const {
         data: customerPortalUrl,
@@ -233,7 +234,11 @@ const SubscriptionManagementPage = () => {
 
     const handleManageBilling = () => {
         if (customerPortalUrl) {
-            window.location.href = customerPortalUrl;
+            setBillingPortalLoading(true);
+            // Add a small delay to show the loading state before redirect
+            setTimeout(() => {
+                window.location.href = customerPortalUrl;
+            }, 100);
         }
     };
 
@@ -350,7 +355,7 @@ const SubscriptionManagementPage = () => {
                     <BillingManagementCard
                         subscription={subscription}
                         customerPortalUrl={customerPortalUrl || null}
-                        portalLoading={portalLoading}
+                        portalLoading={portalLoading || billingPortalLoading}
                         portalError={portalError}
                         onManageBilling={handleManageBilling}
                         isFullWidth={!subscription?.isSubscribed || !currentPlan}

@@ -3,7 +3,7 @@ import { Link } from "wasp/client/router";
 import { logout, useAuth } from "wasp/client/auth";
 import { useNavigate, useLocation } from "react-router-dom";
 // import { Sheet, SheetContent, SheetTrigger } from "../../components/ui/sheet";
-import { Menu, Moon, Sun, SquareUser, LogOut, ChevronDown, Settings, CreditCard, Zap } from "lucide-react";
+import { Menu, Moon, Sun, SquareUser, LogOut, ChevronDown, Settings, CreditCard, Zap, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery } from "wasp/client/operations";
 import { getCurrentUserSubscription } from "wasp/client/operations";
@@ -61,9 +61,13 @@ const NavMenu = ({ className = "", orientation = "horizontal", isAuthenticated =
 
 const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string; profileImage?: string | null; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = () => {
-    logout();
+    setIsLoggingOut(true);
+    setTimeout(() => {
+      logout();
+    }, 100);
   };
 
   return (
@@ -131,10 +135,15 @@ const UserDropdown = ({ userEmail, profileImage, navigate }: { userEmail: string
                   setIsOpen(false);
                   handleLogout();
                 }}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2 text-destructive hover:text-destructive"
+                disabled={isLoggingOut}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2 text-destructive hover:text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <LogOut className="h-4 w-4" />
-                Sign out
+                {isLoggingOut ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4" />
+                )}
+                {isLoggingOut ? 'Signing out...' : 'Sign out'}
               </button>
             </div>
           </div>
@@ -230,10 +239,14 @@ const ThemeToggle = () => {
 
 const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, navigate }: { isAuthenticated?: boolean; userEmail?: string; profileImage?: string | null; navigate: any }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = () => {
-    logout();
-    setIsOpen(false);
+    setIsLoggingOut(true);
+    setTimeout(() => {
+      logout();
+      setIsOpen(false);
+    }, 100);
   };
 
   return (
@@ -307,9 +320,14 @@ const NavigationSheet = ({ isAuthenticated = false, userEmail, profileImage, nav
                 variant="destructive"
                 className="w-full gap-2"
                 onClick={handleLogout}
+                disabled={isLoggingOut}
               >
-                <LogOut className="h-4 w-4" />
-                Sign out
+                {isLoggingOut ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4" />
+                )}
+                {isLoggingOut ? 'Signing out...' : 'Sign out'}
               </Button>
             </div>
           ) : (
