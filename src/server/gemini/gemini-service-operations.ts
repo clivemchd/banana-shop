@@ -2,6 +2,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { HttpError } from 'wasp/server';
 import { validateAndDeductCredits } from '../credits/credit-guard';
 import { createStorageClient } from '../lib/gcs-config';
+import { logger, handleError, AuthenticationError, ImageGenerationError, ConfigurationError } from '../utils';
 
 export interface GenerateImageArgs {
   prompt: string;
@@ -13,7 +14,7 @@ const getAiInstance = () => {
     if (!ai) {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            throw new Error("GEMINI_API_KEY environment variable is not set.");
+            throw new ConfigurationError("GEMINI_API_KEY environment variable is not set.");
         }
         ai = new GoogleGenAI({ apiKey });
     }
@@ -21,16 +22,16 @@ const getAiInstance = () => {
 };
 
 export const generateImage = async (args: GenerateImageArgs, context: any): Promise<{ imageUrl: string; imageId: string }> => {
-    if (!context.user) {
-        throw new HttpError(401, 'User must be authenticated');
-    }
-
-    // Validate subscription and deduct credits using common guard
-    await validateAndDeductCredits(context.user.id, 'IMAGE_GENERATION', context);
-
-    const ai = getAiInstance();
-    const { prompt } = args;
     try {
+        if (!context.user) {
+            throw new AuthenticationError();
+        }
+
+        // Validate subscription and deduct credits using common guard
+        await validateAndDeductCredits(context.user.id, 'IMAGE_GENERATION', context);
+
+        const ai = getAiInstance();
+        const { prompt } = args;
         const textPart = { text: prompt };
 
         const response = await ai.models.generateContent({
@@ -45,18 +46,15 @@ export const generateImage = async (args: GenerateImageArgs, context: any): Prom
         const candidate = response?.candidates?.[0];
 
         if (!candidate) {
-            console.error("Invalid response from Gemini API for image generation.", { 
-                prompt,
-                response: JSON.stringify(response, null, 2) 
-            });
-            throw new Error("The AI model did not return a valid response. Please try again.");
+            logger.error('Invalid response from Gemini API', { prompt });
+            throw new ImageGenerationError("The AI model did not return a valid response. Please try again.");
         }
 
         if (candidate.finishReason && candidate.finishReason !== 'STOP') {
             const reason = candidate.finishReason;
-            console.error(`Gemini API returned finishReason during generation: ${reason}`, {
+            logger.warn('Gemini API returned non-STOP finishReason', {
+                reason,
                 prompt,
-                candidate: JSON.stringify(candidate, null, 2)
             });
             
             let errorMessage = 'Image generation failed. ';
@@ -76,7 +74,7 @@ export const generateImage = async (args: GenerateImageArgs, context: any): Prom
                     errorMessage += `Unexpected error (${reason}). Please try again with a different prompt.`;
             }
             
-            throw new Error(errorMessage);
+            throw new ImageGenerationError(errorMessage);
         }
         
         const imagePartData = candidate.content?.parts?.find(part => part.inlineData)?.inlineData?.data;
@@ -129,29 +127,15 @@ export const generateImage = async (args: GenerateImageArgs, context: any): Prom
             };
         }
 
-        console.error("No image part found in the response for image generation. Full response:", JSON.stringify(response, null, 2));
-        throw new Error("The AI did not generate an image. Try a different prompt or simplify your description.");
+        logger.error('No image part found in Gemini response', { prompt });
+        throw new ImageGenerationError("The AI did not generate an image. Try a different prompt or simplify your description.");
 
     } catch (error) {
-        console.error("Error generating image with Gemini API:", {
-            error,
-            errorMessage: error instanceof Error ? error.message : 'Unknown error',
-            prompt
+        throw handleError(error, {
+            operation: 'generateImage',
+            userId: context?.user?.id,
+            prompt: args.prompt.substring(0, 100),
         });
-        
-        // If it's already a user-friendly error message, throw it as-is
-        if (error instanceof Error && (
-            error.message.includes('safety filters') ||
-            error.message.includes('copyrighted content') ||
-            error.message.includes('Unable to') ||
-            error.message.includes('AI model') ||
-            error.message.includes('AI did not')
-        )) {
-            throw error;
-        }
-        
-        // For unexpected errors, throw a generic message
-        throw new Error('Failed to generate image. Please try again or use a different prompt.');
     }
 };
 // New function for editing images from storage
@@ -247,24 +231,20 @@ export const editImageFromGCS = async (
     const candidate = response?.candidates?.[0];
 
     if (!candidate) {
-      console.error("Invalid response from Gemini API for image editing.", { 
+      logger.error('Invalid response from Gemini API for editing', { 
         imageId, 
         shouldBlend, 
         borderColor,
-        promptLength: finalPrompt.length,
-        response: JSON.stringify(response, null, 2)
       });
-      throw new Error("The AI model did not return a valid response. Please try again.");
+      throw new ImageGenerationError("The AI model did not return a valid response. Please try again.");
     }
 
     if (candidate.finishReason && candidate.finishReason !== 'STOP') {
       const reason = candidate.finishReason;
-      console.error(`Gemini API returned finishReason: ${reason}`, {
+      logger.warn('Gemini API returned non-STOP finishReason for editing', {
+        reason,
         imageId,
         shouldBlend,
-        borderColor,
-        prompt: finalPrompt,
-        candidate: JSON.stringify(candidate, null, 2)
       });
       
       // Provide user-friendly error messages based on finish reason
@@ -289,19 +269,17 @@ export const editImageFromGCS = async (
           errorMessage += `Unexpected error (${reason}). Please try again with a different approach.`;
       }
       
-      throw new Error(errorMessage);
+      throw new ImageGenerationError(errorMessage);
     }
 
     const editedImageData = candidate.content?.parts?.find(part => part.inlineData)?.inlineData?.data;
     
     if (!editedImageData) {
-      console.error("No image data in Gemini response", {
+      logger.error('No image data in Gemini edit response', {
         imageId,
         shouldBlend,
-        borderColor,
-        candidateParts: candidate.content?.parts?.length || 0
       });
-      throw new Error("The AI did not return an edited image. Please try again.");
+      throw new ImageGenerationError("The AI did not return an edited image. Please try again.");
     }
 
     // Delete old file from GCS (cleanup)
@@ -347,26 +325,11 @@ export const editImageFromGCS = async (
       imageId: updatedImage.id
     };
   } catch (error) {
-    console.error('Error editing image from GCS:', {
-      error,
-      errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      imageId,
+    throw handleError(error, {
+      operation: 'editImageFromStorage',
+      userId: context?.user?.id,
+      imageId: args.imageId,
       shouldBlend,
-      borderColor
     });
-    
-    // If it's already a user-friendly error message, throw it as-is
-    if (error instanceof Error && (
-      error.message.includes('safety filters') ||
-      error.message.includes('copyrighted content') ||
-      error.message.includes('Unable to') ||
-      error.message.includes('AI model') ||
-      error.message.includes('AI did not')
-    )) {
-      throw error;
-    }
-    
-    // For unexpected errors, throw a generic message
-    throw new Error('Failed to edit image. Please try again or contact support if the issue persists.');
   }
 };

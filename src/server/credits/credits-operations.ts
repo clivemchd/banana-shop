@@ -1,6 +1,7 @@
 import type { Users } from 'wasp/entities';
 import { HttpError } from 'wasp/server';
 import { paymentPlans, PaymentPlanId } from '../payment/plans';
+import { logger, NotFoundError, InsufficientCreditsError, ValidationError } from '../utils';
 
 // Define credit allocation per plan (per billing cycle)
 export const PLAN_CREDIT_ALLOCATION: Record<PaymentPlanId, number> = {
@@ -29,7 +30,7 @@ export const getUserCredits = async (userId: string, context: any): Promise<numb
   });
 
   if (!user) {
-    throw new HttpError(404, 'User not found');
+    throw new NotFoundError('User');
   }
 
   return user.credits || 0;
@@ -45,7 +46,7 @@ export const addCredits = async (
   context: any
 ): Promise<{ success: boolean; newBalance: number }> => {
   if (amount <= 0) {
-    throw new HttpError(400, 'Credit amount must be positive');
+    throw new ValidationError('Credit amount must be positive');
   }
 
   const user = await context.entities.Users.findUnique({
@@ -53,7 +54,7 @@ export const addCredits = async (
   });
 
   if (!user) {
-    throw new HttpError(404, 'User not found');
+    throw new NotFoundError('User');
   }
 
   const currentCredits = user.credits || 0;
@@ -64,8 +65,8 @@ export const addCredits = async (
     data: { credits: newBalance }
   });
 
-  // Log the credit transaction (you could create a separate CreditTransactions table)
-  console.log(`💳 Credits added - User: ${userId}, Amount: +${amount}, Reason: ${reason}, Balance: ${newBalance}`);
+  // Log the credit transaction
+  logger.info('Credits added', { userId, amount, reason, newBalance });
 
   return {
     success: true,
@@ -88,13 +89,13 @@ export const deductCredits = async (
   });
 
   if (!user) {
-    throw new HttpError(404, 'User not found');
+    throw new NotFoundError('User');
   }
 
   const currentCredits = user.credits || 0;
 
   if (currentCredits < creditCost) {
-    throw new HttpError(402, `Insufficient credits. Required: ${creditCost}, Available: ${currentCredits}`);
+    throw new InsufficientCreditsError(creditCost, currentCredits);
   }
 
   const newBalance = currentCredits - creditCost;
@@ -105,7 +106,7 @@ export const deductCredits = async (
   });
 
   // Log the credit transaction
-  console.log(`💳 Credits deducted - User: ${userId}, Operation: ${operation}, Cost: -${creditCost}, Balance: ${newBalance}`);
+  logger.info('Credits deducted', { userId, operation, creditCost, newBalance });
 
   return {
     success: true,
@@ -145,12 +146,12 @@ export const syncCreditsWithSubscription = async (
   });
 
   if (!user) {
-    throw new HttpError(404, 'User not found');
+    throw new NotFoundError('User');
   }
 
   // Only sync if user has an active subscription
   if (user.subscriptionStatus !== 'active' || !user.subscriptionPlan) {
-    console.log(`⚠️ Credits sync skipped - User ${userId} has no active subscription`);
+    logger.warn('Credits sync skipped - no active subscription', { userId });
     return {
       success: false,
       newBalance: user.credits || 0
@@ -161,7 +162,7 @@ export const syncCreditsWithSubscription = async (
   const planCredits = PLAN_CREDIT_ALLOCATION[planId];
 
   if (planCredits === undefined) {
-    throw new HttpError(400, `Unknown subscription plan: ${planId}`);
+    throw new ValidationError(`Unknown subscription plan: ${planId}`);
   }
 
   // Check if user already has the correct credits for this billing cycle
@@ -207,7 +208,7 @@ export const resetCreditsForBillingCycle = async (
   });
 
   if (!user) {
-    throw new HttpError(404, 'User not found');
+    throw new NotFoundError('User');
   }
 
   // Only reset if user has an active subscription
@@ -222,7 +223,7 @@ export const resetCreditsForBillingCycle = async (
   const planCredits = PLAN_CREDIT_ALLOCATION[planId];
 
   if (planCredits === undefined) {
-    throw new HttpError(400, `Unknown subscription plan: ${planId}`);
+    throw new ValidationError(`Unknown subscription plan: ${planId}`);
   }
 
   await context.entities.Users.update({
@@ -230,7 +231,7 @@ export const resetCreditsForBillingCycle = async (
     data: { credits: planCredits }
   });
 
-  console.log(`🔄 Credits reset for billing cycle - User: ${userId}, Plan: ${planId}, New balance: ${planCredits}`);
+  logger.info('Credits reset for billing cycle', { userId, planId, newBalance: planCredits });
 
   return {
     success: true,

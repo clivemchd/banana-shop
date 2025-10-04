@@ -1,4 +1,10 @@
 import type { Image } from 'wasp/entities';
+import { 
+  handleError, 
+  AuthenticationError, 
+  NotFoundError, 
+  UnauthorizedError 
+} from '../utils';
 
 export interface GetUserImagesArgs {
   limit?: number;
@@ -10,13 +16,13 @@ export const getUserImages = async (
   args: GetUserImagesArgs = {},
   context: any
 ) => {
-  if (!context.user) {
-    throw new Error('User must be authenticated');
-  }
-
-  const { limit = 20, offset = 0, search } = args;
-
   try {
+    if (!context.user) {
+      throw new AuthenticationError();
+    }
+
+    const { limit = 20, offset = 0, search } = args;
+
     const whereClause: any = {
       userId: context.user.id,
     };
@@ -77,8 +83,10 @@ export const getUserImages = async (
       hasMore: offset + images.length < totalCount,
     };
   } catch (error) {
-    console.error('Error getting user images:', error);
-    throw new Error('Failed to retrieve user images');
+    throw handleError(error, {
+      operation: 'getUserImages',
+      userId: context?.user?.id,
+    });
   }
 };
 
@@ -86,13 +94,13 @@ export const getImageWithHistory = async (
   args: { imageId: string },
   context: any
 ) => {
-  if (!context.user) {
-    throw new Error('User must be authenticated');
-  }
-
-  const { imageId } = args;
-
   try {
+    if (!context.user) {
+      throw new AuthenticationError();
+    }
+
+    const { imageId } = args;
+
     const image = await context.entities.Image.findUnique({
       where: { id: imageId },
       include: {
@@ -105,11 +113,11 @@ export const getImageWithHistory = async (
     });
 
     if (!image) {
-      throw new Error('Image not found');
+      throw new NotFoundError('Image');
     }
 
     if (image.userId !== context.user.id) {
-      throw new Error('Unauthorized access to image');
+      throw new UnauthorizedError();
     }
 
     return {
@@ -131,8 +139,11 @@ export const getImageWithHistory = async (
       })),
     };
   } catch (error) {
-    console.error('Error getting image with history:', error);
-    throw new Error('Failed to retrieve image with history');
+    throw handleError(error, {
+      operation: 'getImageWithHistory',
+      userId: context?.user?.id,
+      imageId: args.imageId,
+    });
   }
 };
 
@@ -140,23 +151,23 @@ export const getImageById = async (
   args: { imageId: string },
   context: any
 ) => {
-  if (!context.user) {
-    throw new Error('User must be authenticated');
-  }
-
-  const { imageId } = args;
-
   try {
+    if (!context.user) {
+      throw new AuthenticationError();
+    }
+
+    const { imageId } = args;
+
     const image = await context.entities.Image.findUnique({
       where: { id: imageId },
     });
 
     if (!image) {
-      throw new Error('Image not found');
+      throw new NotFoundError('Image');
     }
 
     if (image.userId !== context.user.id) {
-      throw new Error('Unauthorized access to image');
+      throw new UnauthorizedError();
     }
 
     return {
@@ -170,8 +181,11 @@ export const getImageById = async (
       updatedAt: image.updatedAt,
     };
   } catch (error) {
-    console.error('Error getting image by ID:', error);
-    throw new Error('Failed to retrieve image');
+    throw handleError(error, {
+      operation: 'getImageById',
+      userId: context?.user?.id,
+      imageId: args.imageId,
+    });
   }
 };
 
@@ -179,21 +193,21 @@ export const searchUserImages = async (
   args: { query: string; limit?: number; offset?: number },
   context: any
 ): Promise<any> => {
-  if (!context.user) {
-    throw new Error('User must be authenticated');
-  }
-
-  const { query, limit = 20, offset = 0 } = args;
-
-  if (!query || query.trim().length === 0) {
-    return {
-      images: [],
-      totalCount: 0,
-      hasMore: false,
-    };
-  }
-
   try {
+    if (!context.user) {
+      throw new AuthenticationError();
+    }
+
+    const { query, limit = 20, offset = 0 } = args;
+
+    if (!query || query.trim().length === 0) {
+      return {
+        images: [],
+        totalCount: 0,
+        hasMore: false,
+      };
+    }
+
     const whereClause = {
       userId: context.user.id,
       OR: [
@@ -259,7 +273,10 @@ export const searchUserImages = async (
       hasMore: offset + images.length < totalCount,
     };
   } catch (error) {
-    console.error('Error searching user images:', error);
-    throw new Error('Failed to search images');
+    throw handleError(error, {
+      operation: 'searchUserImages',
+      userId: context?.user?.id,
+      query: args.query,
+    });
   }
 };

@@ -1,4 +1,11 @@
 import { getStorageBucket } from '../lib/gcs-config';
+import { 
+  logger,
+  handleError, 
+  AuthenticationError, 
+  ValidationError,
+  StorageError 
+} from '../utils';
 
 // Initialize Google Cloud Storage bucket
 const bucket = getStorageBucket();
@@ -24,17 +31,17 @@ export const generatePresignedUploadUrl = async (
   args: GeneratePresignedUploadUrlArgs,
   context: any
 ): Promise<{ uploadUrl: string; gcsFileName: string; imageId?: string }> => {
-  if (!context.user) {
-    throw new Error('User must be authenticated');
-  }
-
-  const { fileName, mimeType, imageId } = args;
-
   try {
+    if (!context.user) {
+      throw new AuthenticationError();
+    }
+
+    const { fileName, mimeType, imageId } = args;
+
     // Validate file type
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!allowedTypes.includes(mimeType)) {
-      throw new Error(`Unsupported file type: ${mimeType}`);
+      throw new ValidationError(`Unsupported file type: ${mimeType}`);
     }
 
     // If updating existing image, delete old file first
@@ -48,7 +55,10 @@ export const generatePresignedUploadUrl = async (
           const oldFile = bucket.file(existingImage.fileName);
           await oldFile.delete();
         } catch (deleteError) {
-          console.warn(`Failed to delete old file ${existingImage.fileName}:`, deleteError);
+          logger.warn('Failed to delete old file', {
+            userId: context.user.id,
+            fileName: existingImage.fileName,
+          });
         }
       }
     }
@@ -70,8 +80,11 @@ export const generatePresignedUploadUrl = async (
       imageId,
     };
   } catch (error) {
-    console.error('Error generating presigned upload URL:', error);
-    throw new Error('Failed to generate presigned upload URL');
+    throw handleError(error, {
+      operation: 'generatePresignedUploadUrl',
+      userId: context?.user?.id,
+      fileName: args.fileName,
+    });
   }
 };
 
@@ -83,13 +96,13 @@ export const confirmImageUpload = async (
   args: ConfirmImageUploadArgs,
   context: any
 ): Promise<{ imageUrl: string; imageId: string }> => {
-  if (!context.user) {
-    throw new Error('User must be authenticated');
-  }
-
-  const { imageId, fileName, gcsFileName, mimeType } = args;
-
   try {
+    if (!context.user) {
+      throw new AuthenticationError();
+    }
+
+    const { imageId, fileName, gcsFileName, mimeType } = args;
+
     const file = bucket.file(gcsFileName);
 
     // Generate SIGNED URL for reading (24 hour expiry - private, user-specific)
@@ -130,7 +143,10 @@ export const confirmImageUpload = async (
       imageId: image.id,
     };
   } catch (error) {
-    console.error('Error confirming image upload:', error);
-    throw new Error('Failed to confirm image upload');
+    throw handleError(error, {
+      operation: 'confirmImageUpload',
+      userId: context?.user?.id,
+      fileName: args.fileName,
+    });
   }
 };

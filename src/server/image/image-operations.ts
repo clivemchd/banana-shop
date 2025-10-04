@@ -1,6 +1,14 @@
-import { HttpError } from 'wasp/server';
 import { generateTextToImage as generateTextToImageCore, generateImageToImage as generateImageToImageCore } from '../fal-test';
 import { hasEnoughCredits, deductCredits } from '../credits/credits-operations';
+import { 
+  logger, 
+  handleError, 
+  AuthenticationError, 
+  InsufficientCreditsError,
+  ImageGenerationError,
+  UnauthorizedError,
+  NotFoundError 
+} from '../utils';
 
 interface ImageOptionTypes {
     image_size?: "square_hd" | "square" | "portrait_4_3" | "portrait_16_9" | "landscape_4_3" | "landscape_16_9";
@@ -26,18 +34,18 @@ export const generateTextToImage = async (
     { prompt, options }: GenerateTextToImageTypes, 
     context: any
 ) => {
-    if (!context.user) {
-        throw new HttpError(401, 'User must be logged in to generate images');
-    }
-
-    // Check if user has enough credits
-    const creditCheck = await hasEnoughCredits(context.user.id, 'IMAGE_GENERATION', context);
-    
-    if (!creditCheck.hasEnough) {
-        throw new HttpError(402, `Insufficient credits. Required: ${creditCheck.required}, Available: ${creditCheck.available}`);
-    }
-
     try {
+        if (!context.user) {
+            throw new AuthenticationError('User must be logged in to generate images');
+        }
+
+        // Check if user has enough credits
+        const creditCheck = await hasEnoughCredits(context.user.id, 'IMAGE_GENERATION', context);
+        
+        if (!creditCheck.hasEnough) {
+            throw new InsufficientCreditsError(creditCheck.required, creditCheck.available);
+        }
+
         // Generate the image
         const result = await generateTextToImageCore({ prompt, options });
 
@@ -56,9 +64,12 @@ export const generateTextToImage = async (
         }
 
         return result;
-    } catch (error: any) {
-        console.error('Error generating text-to-image:', error);
-        throw new HttpError(500, `Image generation failed: ${error.message}`);
+    } catch (error) {
+        throw handleError(error, {
+            operation: 'generateTextToImage',
+            userId: context?.user?.id,
+            prompt: prompt.substring(0, 100),
+        });
     }
 };
 
@@ -69,18 +80,18 @@ export const generateImageToImage = async (
     { prompt, options, image_urls }: GenerateImageToImageTypes, 
     context: any
 ) => {
-    if (!context.user) {
-        throw new HttpError(401, 'User must be logged in to edit images');
-    }
-
-    // Check if user has enough credits for image editing
-    const creditCheck = await hasEnoughCredits(context.user.id, 'IMAGE_EDIT', context);
-    
-    if (!creditCheck.hasEnough) {
-        throw new HttpError(402, `Insufficient credits. Required: ${creditCheck.required}, Available: ${creditCheck.available}`);
-    }
-
     try {
+        if (!context.user) {
+            throw new AuthenticationError('User must be logged in to edit images');
+        }
+
+        // Check if user has enough credits for image editing
+        const creditCheck = await hasEnoughCredits(context.user.id, 'IMAGE_EDIT', context);
+        
+        if (!creditCheck.hasEnough) {
+            throw new InsufficientCreditsError(creditCheck.required, creditCheck.available);
+        }
+
         // Generate the image
         const result = await generateImageToImageCore({ prompt, options, image_urls });
 
@@ -99,9 +110,12 @@ export const generateImageToImage = async (
         }
 
         return result;
-    } catch (error: any) {
-        console.error('Error generating image-to-image:', error);
-        throw new HttpError(500, `Image editing failed: ${error.message}`);
+    } catch (error) {
+        throw handleError(error, {
+            operation: 'generateImageToImage',
+            userId: context?.user?.id,
+            prompt: prompt.substring(0, 100),
+        });
     }
 };
 
@@ -124,24 +138,24 @@ export const saveImagePermanently = async (
   args: SaveImagePermanentlyArgs,
   context: any
 ): Promise<{ id: string; url: string }> => {
-  if (!context.user) {
-    throw new Error('User must be authenticated');
-  }
-
-  const { tempImageId, description } = args;
-
   try {
+    if (!context.user) {
+      throw new AuthenticationError();
+    }
+
+    const { tempImageId, description } = args;
+
     // Find the temp image
     const tempImage = await context.entities.TempImage.findUnique({
       where: { id: tempImageId },
     });
 
     if (!tempImage) {
-      throw new Error('Temp image not found');
+      throw new NotFoundError('Temporary image');
     }
 
     if (tempImage.userId !== context.user.id) {
-      throw new Error('Unauthorized access to temp image');
+      throw new UnauthorizedError();
     }
 
     // Create permanent image record
@@ -176,8 +190,11 @@ export const saveImagePermanently = async (
       url: permanentImage.url,
     };
   } catch (error) {
-    console.error('Error saving image permanently:', error);
-    throw new Error('Failed to save image permanently');
+    throw handleError(error, {
+      operation: 'saveImagePermanently',
+      userId: context?.user?.id,
+      tempImageId: args.tempImageId,
+    });
   }
 };
 
@@ -185,24 +202,24 @@ export const createImageEdit = async (
   args: CreateImageEditArgs,
   context: any
 ): Promise<{ id: string }> => {
-  if (!context.user) {
-    throw new Error('User must be authenticated');
-  }
-
-  const { imageId, editType, prompt, beforeUrl, afterUrl } = args;
-
   try {
+    if (!context.user) {
+      throw new AuthenticationError();
+    }
+
+    const { imageId, editType, prompt, beforeUrl, afterUrl } = args;
+
     // Verify user owns the image
     const image = await context.entities.Image.findUnique({
       where: { id: imageId },
     });
 
     if (!image) {
-      throw new Error('Image not found');
+      throw new NotFoundError('Image');
     }
 
     if (image.userId !== context.user.id) {
-      throw new Error('Unauthorized access to image');
+      throw new UnauthorizedError();
     }
 
     // Create edit record
@@ -230,7 +247,10 @@ export const createImageEdit = async (
       id: imageEdit.id,
     };
   } catch (error) {
-    console.error('Error creating image edit:', error);
-    throw new Error('Failed to create image edit');
+    throw handleError(error, {
+      operation: 'createImageEdit',
+      userId: context?.user?.id,
+      imageId: args.imageId,
+    });
   }
 };
