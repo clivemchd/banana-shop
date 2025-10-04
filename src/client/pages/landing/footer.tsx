@@ -1,4 +1,3 @@
-import { Separator } from "../../components/ui/separator";
 import Logo from "../../core/logo/logo";
 import { Link } from "react-router-dom";
 
@@ -14,7 +13,18 @@ const XIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const footerSections = [
+type FooterLink = {
+  title: string;
+  href: string;
+  status?: 'COMING_SOON';
+};
+
+type FooterSection = {
+  title: string;
+  links: FooterLink[];
+};
+
+const footerSections: FooterSection[] = [
   {
     title: "Product",
     links: [
@@ -47,27 +57,13 @@ const footerSections = [
       {
         title: "Blog",
         href: "#",
+        status: 'COMING_SOON'
       },
       {
         title: "Newsletter",
         href: "#",
-      },
-      {
-        title: "Events",
-        href: "#",
-      },
-      {
-        title: "Help centre",
-        href: "#",
-      },
-      {
-        title: "Tutorials",
-        href: "#",
-      },
-      {
-        title: "Support",
-        href: "#",
-      },
+        status: 'COMING_SOON'
+      }
     ],
   },
   {
@@ -90,6 +86,42 @@ const footerSections = [
 ];
 
 const Footer = () => {
+  const handleSectionClick = (href: string) => {
+    // Check if it's a hash link (section on landing page)
+    if (href.startsWith('#')) {
+      const sectionId = href.substring(1); // Remove the '#'
+      
+      // Handle empty hash (like "#") - navigate to home page top
+      if (!sectionId || sectionId.trim() === '') {
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        return;
+      }
+      
+      // If we're not on the home page, navigate to home first
+      if (window.location.pathname !== '/') {
+        // Navigate to home with hash, then scroll after a brief delay
+        window.location.href = `/${href}`;
+        // The scrolling will be handled by the landing page useEffect
+      } else {
+        // If we're on the home page, update the hash and scroll to the section
+        window.history.pushState(null, '', href);
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    }
+  };
+
+  const handleInternalLinkClick = () => {
+    // Scroll to top when clicking internal route links
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <footer className="mt-12 xs:mt-20 dark bg-background border-t">
       <div className="max-w-screen-xl mx-auto py-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-x-8 gap-y-10 px-6">
@@ -102,21 +134,32 @@ const Footer = () => {
         <div className="xl:justify-self-end">
           <h6 className="font-semibold text-foreground">Legal</h6>
           <ul className="mt-6 space-y-4">
-            {footerSections.find(s => s.title === "Legal")?.links.map(({ title, href }) => (
+            {footerSections.find(s => s.title === "Legal")?.links.map(({ title, href, status }) => (
               <li key={title}>
                 {href.startsWith('/') ? (
                   <Link
                     to={href}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={handleInternalLinkClick}
+                    className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
                   >
                     {title}
+                    {status === 'COMING_SOON' && (
+                      <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium">
+                        Soon
+                      </span>
+                    )}
                   </Link>
                 ) : (
                   <a
                     href={href}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
                   >
                     {title}
+                    {status === 'COMING_SOON' && (
+                      <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium">
+                        Soon
+                      </span>
+                    )}
                   </a>
                 )}
               </li>
@@ -129,14 +172,46 @@ const Footer = () => {
           <div key={title} className="xl:justify-self-end">
             <h6 className="font-semibold text-foreground">{title}</h6>
             <ul className="mt-6 space-y-4">
-              {links.map(({ title, href }) => (
+              {links.map(({ title, href, status }) => (
                 <li key={title}>
-                  <a
-                    href={href}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {title}
-                  </a>
+                  {href.startsWith('/') ? (
+                    <Link
+                      to={href}
+                      onClick={handleInternalLinkClick}
+                      className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
+                    >
+                      {title}
+                      {status === 'COMING_SOON' && (
+                        <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium">
+                          Soon
+                        </span>
+                      )}
+                    </Link>
+                  ) : href.startsWith('#') ? (
+                    <button
+                      onClick={() => handleSectionClick(href)}
+                      className="text-muted-foreground hover:text-foreground transition-colors text-left inline-flex items-center gap-2"
+                    >
+                      {title}
+                      {status === 'COMING_SOON' && (
+                        <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium">
+                          Soon
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <a
+                      href={href}
+                      className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
+                    >
+                      {title}
+                      {status === 'COMING_SOON' && (
+                        <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium">
+                          Soon
+                        </span>
+                      )}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
