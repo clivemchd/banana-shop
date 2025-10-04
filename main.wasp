@@ -96,6 +96,11 @@ page CheckoutPage {
 	component: import CheckoutPage from "@src/server/payment/checkout-page"
 }
 
+route CookiePolicyRoute { path: "/cookie-policy", to: CookiePolicyPage }
+page CookiePolicyPage {
+	component: import { CookiePolicyPage } from "@src/client/pages/legal/cookie-policy"
+}
+
 query generateTextToImage {
 	fn: import { generateTextToImage } from "@src/server/image/image-operations",
 	entities: [Users]

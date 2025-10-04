@@ -1,5 +1,6 @@
 import { Separator } from "../../components/ui/separator";
 import Logo from "../../core/logo/logo";
+import { Link } from "react-router-dom";
 
 const footerSections = [
   {
@@ -131,20 +132,8 @@ const footerSections = [
       },
       {
         title: "Cookies",
-        href: "#",
-      },
-      {
-        title: "Licenses",
-        href: "#",
-      },
-      {
-        title: "Settings",
-        href: "#",
-      },
-      {
-        title: "Contact",
-        href: "#",
-      },
+        href: "/cookie-policy",
+      }
     ],
   },
 ];
@@ -156,13 +145,36 @@ const Footer = () => {
         <div className="col-span-full xl:col-span-2">
           {/* Logo */}
           <Logo />
-
-          {/* <p className="mt-4 text-muted-foreground">
-            Create stunning images from text and edit them with precision using our advanced AI tools. Transform your creative vision into reality with just a few clicks.
-          </p> */}
         </div>
 
-        {/* {footerSections.map(({ title, links }) => (
+        {/* Legal section - now visible */}
+        <div className="xl:justify-self-end">
+          <h6 className="font-semibold text-foreground">Legal</h6>
+          <ul className="mt-6 space-y-4">
+            {footerSections.find(s => s.title === "Legal")?.links.map(({ title, href }) => (
+              <li key={title}>
+                {href.startsWith('/') ? (
+                  <Link
+                    to={href}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {title}
+                  </Link>
+                ) : (
+                  <a
+                    href={href}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {title}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Uncomment other sections as needed */}
+        {/* {footerSections.filter(s => s.title !== "Legal").map(({ title, links }) => (
           <div key={title} className="xl:justify-self-end">
             <h6 className="font-semibold text-foreground">{title}</h6>
             <ul className="mt-6 space-y-4">
