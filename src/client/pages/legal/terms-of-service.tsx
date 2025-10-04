@@ -55,7 +55,7 @@ export const TermsOfServicePage = () => {
 
             <p>
               You can contact us by email at{' '}
-              <a href="mailto:clivemchd@gmail.com">clivemchd@gmail.com</a> or by mail to Germany.
+              our <Link to="/contact" className="text-primary hover:underline">contact page</Link> or by mail to Germany.
             </p>
 
             <p>
@@ -136,7 +136,7 @@ export const TermsOfServicePage = () => {
             </p>
             <p>
               If you wish to make any use of the Services, Content, or Marks other than as set out in this section or elsewhere in our Legal Terms, please address your request to:{' '}
-              <a href="mailto:clivemchd@gmail.com">clivemchd@gmail.com</a>. If we ever grant you the permission to post, reproduce, or publicly display any part of our Services or Content, you must identify us as the owners or licensors of the Services, Content, or Marks and ensure that any copyright or proprietary notice appears or is visible on posting, reproducing, or displaying our Content.
+              our <Link to="/contact" className="text-primary hover:underline">contact page</Link>. If we ever grant you the permission to post, reproduce, or publicly display any part of our Services or Content, you must identify us as the owners or licensors of the Services, Content, or Marks and ensure that any copyright or proprietary notice appears or is visible on posting, reproducing, or displaying our Content.
             </p>
             <p>
               We reserve all rights not expressly granted to you in and to the Services, Content, and Marks.
@@ -231,8 +231,8 @@ export const TermsOfServicePage = () => {
 
             <h3>Cancellation</h3>
             <p>
-              You can cancel your subscription at any time by logging into your account. Your cancellation will take effect at the end of the current paid term. If you have any questions or are unsatisfied with our Services, please email us at{' '}
-              <a href="mailto:clivemchd@gmail.com">clivemchd@gmail.com</a>.
+              You can cancel your subscription at any time by logging into your account. Your cancellation will take effect at the end of the current paid term. If you have any questions or are unsatisfied with our Services, please visit{' '}
+              <Link to="/contact" className="text-primary hover:underline">our contact page</Link>.
             </p>
 
             <h3>Fee Changes</h3>
@@ -424,9 +424,9 @@ export const TermsOfServicePage = () => {
             <div className="mt-4">
               <p className="font-medium text-foreground">MacDev</p>
               <p>
-                <a href="mailto:clivemchd@gmail.com" className="text-primary hover:underline">
-                  clivemchd@gmail.com
-                </a>
+                <Link to="/contact" className="text-primary hover:underline">
+                  our contact page
+                </Link>
               </p>
             </div>
           </div>
