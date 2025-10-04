@@ -297,13 +297,13 @@ export const CookiePolicyPage = () => {
               <section>
                 <h2 className="text-2xl font-semibold mb-4">Where can I get further information?</h2>
                 <p className="text-foreground leading-relaxed">
-                  If you have any questions about our use of cookies or other technologies, please email us at{' '}
-                  <a 
-                    href="mailto:clivemchd@gmail.com" 
+                  If you have any questions about our use of cookies or other technologies, please{' '}
+                  <Link 
+                    to="/contact" 
                     className="text-primary hover:underline"
                   >
-                    clivemchd@gmail.com
-                  </a>{' '}
+                    contact us
+                  </Link>.
                 </p>
                 <div className="mt-4">
                   <p className="font-medium text-foreground">MacDev</p>

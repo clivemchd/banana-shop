@@ -34,7 +34,7 @@ export const PrivacyPolicyPage = () => {
             </ul>
 
             <p>
-              <strong>Questions or concerns?</strong> Reading this privacy notice will help you understand your privacy rights and choices. If you do not agree with our policies and practices, please do not use our Services. If you still have any questions or concerns, please contact us at <a href="mailto:clivemchd@gmail.com">clivemchd@gmail.com</a>.
+              <strong>Questions or concerns?</strong> Reading this privacy notice will help you understand your privacy rights and choices. If you do not agree with our policies and practices, please do not use our Services. If you still have any questions or concerns, please <Link to="/contact" className="text-primary hover:underline">contact us</Link>.
             </p>
 
             {/* Summary of Key Points */}
@@ -208,7 +208,7 @@ export const PrivacyPolicyPage = () => {
               However, please note that this will not affect the lawfulness of the processing before its withdrawal nor, when applicable law allows, will it affect the processing of your personal information conducted in reliance on lawful processing grounds other than consent.
             </p>
             <p>
-              If you have questions or comments about your privacy rights, you may email us at <a href="mailto:clivemchd@gmail.com">clivemchd@gmail.com</a>.
+              If you have questions or comments about your privacy rights, you may <Link to="/contact" className="text-primary hover:underline">contact us</Link>.
             </p>
 
             <h2 id="DNT">8. Controls For Do-Not-Track Features</h2>
@@ -283,7 +283,7 @@ export const PrivacyPolicyPage = () => {
 
             <h2 id="contact">12. How Can You Contact Us About This Notice?</h2>
             <p>
-              If you have questions or comments about this notice, you may email us at <a href="mailto:clivemchd@gmail.com">clivemchd@gmail.com</a>
+              If you have questions or comments about this notice, you may <Link to="/contact" className="text-primary hover:underline">contact us</Link>
             </p>
 
             <h2 id="request">13. How Can You Review, Update, Or Delete The Data We Collect From You?</h2>

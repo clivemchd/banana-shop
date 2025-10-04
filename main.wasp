@@ -111,7 +111,15 @@ route TermsOfServiceRoute { path: "/terms", to: TermsOfServicePage }
 page TermsOfServicePage {
   authRequired: false,
   component: import { TermsOfServicePage } from "@src/client/pages/legal/terms-of-service"
-}query generateTextToImage {
+}
+
+route ContactPageRoute { path: "/contact", to: ContactPage }
+page ContactPage {
+  authRequired: false,
+  component: import ContactPage from "@src/client/pages/contact/contact-page"
+}
+
+query generateTextToImage {
 	fn: import { generateTextToImage } from "@src/server/image/image-operations",
 	entities: [Users]
 }
@@ -205,6 +213,10 @@ action syncUserCredits {
 action addCreditsToUser {
 	fn: import { addCreditsToUser } from "@src/server/credits/credits-queries",
 	entities: [Users]
+}
+
+action submitContactForm {
+	fn: import { submitContactForm } from "@src/server/contact/contact-operations"
 }
 
 // Stripe webhook
