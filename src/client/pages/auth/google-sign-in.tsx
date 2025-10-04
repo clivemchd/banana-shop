@@ -67,7 +67,18 @@ export const GoogleSignInPage = () => {
 
                   {/* Info Message */}
                   <div className="text-xs text-center text-muted-foreground">
-                    By signing in, you agree to our Terms of Service and Privacy Policy
+                    By signing in, you agree to our{' '}
+                    <Link to="/terms" className="text-primary hover:underline">
+                      Terms of Service
+                    </Link>
+                    ,{' '}
+                    <Link to="/privacy-policy" className="text-primary hover:underline">
+                      Privacy Policy
+                    </Link>
+                    , and{' '}
+                    <Link to="/cookie-policy" className="text-primary hover:underline">
+                      Cookie Policy
+                    </Link>
                   </div>
                 </div>
               </CardContent>

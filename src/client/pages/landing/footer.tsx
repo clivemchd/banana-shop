@@ -124,11 +124,11 @@ const footerSections = [
     links: [
       {
         title: "Terms",
-        href: "#",
+        href: "/terms",
       },
       {
         title: "Privacy",
-        href: "#",
+        href: "/privacy-policy",
       },
       {
         title: "Cookies",

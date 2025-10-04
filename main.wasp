@@ -101,7 +101,17 @@ page CookiePolicyPage {
 	component: import { CookiePolicyPage } from "@src/client/pages/legal/cookie-policy"
 }
 
-query generateTextToImage {
+route PrivacyPolicyRoute { path: "/privacy-policy", to: PrivacyPolicyPage }
+page PrivacyPolicyPage {
+  authRequired: false,
+  component: import { PrivacyPolicyPage } from "@src/client/pages/legal/privacy-policy"
+}
+
+route TermsOfServiceRoute { path: "/terms", to: TermsOfServicePage }
+page TermsOfServicePage {
+  authRequired: false,
+  component: import { TermsOfServicePage } from "@src/client/pages/legal/terms-of-service"
+}query generateTextToImage {
 	fn: import { generateTextToImage } from "@src/server/image/image-operations",
 	entities: [Users]
 }
