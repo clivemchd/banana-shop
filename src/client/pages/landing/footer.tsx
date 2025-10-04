@@ -2,6 +2,18 @@ import { Separator } from "../../components/ui/separator";
 import Logo from "../../core/logo/logo";
 import { Link } from "react-router-dom";
 
+// X (formerly Twitter) icon component
+const XIcon = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={className}
+    fill="currentColor"
+    aria-hidden="true"
+  >
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
 const footerSections = [
   {
     title: "Product",
@@ -12,49 +24,17 @@ const footerSections = [
       },
       {
         title: "Features",
-        href: "#",
-      },
-      {
-        title: "Solutions",
-        href: "#",
-      },
-      {
-        title: "Tutorials",
-        href: "#",
+        href: "#features",
       },
       {
         title: "Pricing",
-        href: "#",
-      },
-      {
-        title: "Releases",
-        href: "#",
-      },
+        href: "#pricing",
+      }
     ],
   },
   {
     title: "Company",
     links: [
-      {
-        title: "About us",
-        href: "#",
-      },
-      {
-        title: "Careers",
-        href: "#",
-      },
-      {
-        title: "Press",
-        href: "#",
-      },
-      {
-        title: "News",
-        href: "#",
-      },
-      {
-        title: "Media kit",
-        href: "#",
-      },
       {
         title: "Contact",
         href: "#",
@@ -86,35 +66,6 @@ const footerSections = [
       },
       {
         title: "Support",
-        href: "#",
-      },
-    ],
-  },
-  {
-    title: "Social",
-    links: [
-      {
-        title: "Twitter",
-        href: "#",
-      },
-      {
-        title: "LinkedIn",
-        href: "#",
-      },
-      {
-        title: "Facebook",
-        href: "#",
-      },
-      {
-        title: "GitHub",
-        href: "#",
-      },
-      {
-        title: "AngelList",
-        href: "#",
-      },
-      {
-        title: "Dribbble",
         href: "#",
       },
     ],
@@ -174,7 +125,7 @@ const Footer = () => {
         </div>
 
         {/* Uncomment other sections as needed */}
-        {/* {footerSections.filter(s => s.title !== "Legal").map(({ title, links }) => (
+        {footerSections.filter(s => s.title !== "Legal").map(({ title, links }) => (
           <div key={title} className="xl:justify-self-end">
             <h6 className="font-semibold text-foreground">{title}</h6>
             <ul className="mt-6 space-y-4">
@@ -190,10 +141,10 @@ const Footer = () => {
               ))}
             </ul>
           </div>
-        ))} */}
+        ))}
       </div>
       {/* <Separator /> */}
-      {/* <div className="max-w-screen-xl mx-auto py-8 flex flex-col-reverse sm:flex-row items-center justify-between gap-x-2 gap-y-5 px-6">
+      <div className="max-w-screen-xl mx-auto py-8 flex flex-col-reverse sm:flex-row items-center justify-between gap-x-2 gap-y-5 px-6">
         <span className="text-muted-foreground text-center xs:text-start">
           &copy; {new Date().getFullYear()}{" "}
           <a href="#" target="_blank">
@@ -203,10 +154,10 @@ const Footer = () => {
         </span>
 
         <div className="flex items-center gap-5 text-muted-foreground">
-          <a href="#" target="_blank">
-            <Twitter className="h-5 w-5" />
+          <a href="https://x.com/MoneOunchPan" target="_blank">
+            <XIcon className="h-5 w-5" />
           </a>
-          <a href="#" target="_blank">
+          {/* <a href="#" target="_blank">
             <Instagram className="h-5 w-5" />
           </a>
           <a href="#" target="_blank">
@@ -214,9 +165,9 @@ const Footer = () => {
           </a>
           <a href="#" target="_blank">
             <Github className="h-5 w-5" />
-          </a>
+          </a> */}
         </div>
-      </div> */}
+      </div>
     </footer>
   );
 };
