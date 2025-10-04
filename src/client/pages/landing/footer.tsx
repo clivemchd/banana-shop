@@ -37,7 +37,7 @@ const footerSections = [
     links: [
       {
         title: "Contact",
-        href: "#",
+        href: "/contact",
       },
     ],
   },
