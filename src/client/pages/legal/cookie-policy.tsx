@@ -294,7 +294,7 @@ export const CookiePolicyPage = () => {
               </section>
 
               {/* Contact */}
-              {/* <section>
+              <section>
                 <h2 className="text-2xl font-semibold mb-4">Where can I get further information?</h2>
                 <p className="text-foreground leading-relaxed">
                   If you have any questions about our use of cookies or other technologies, please email us at{' '}
@@ -304,13 +304,11 @@ export const CookiePolicyPage = () => {
                   >
                     clivemchd@gmail.com
                   </a>{' '}
-                  or by post to:
                 </p>
-                <div className="mt-4 p-4 bg-accent rounded-lg">
+                <div className="mt-4">
                   <p className="font-medium text-foreground">MacDev</p>
-                  <p className="text-foreground mt-1">Germany</p>
                 </div>
-              </section> */}
+              </section>
             </div>
           </div>
 
